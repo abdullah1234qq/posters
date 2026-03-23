@@ -39,6 +39,10 @@ const Profile = () => {
   const [bio, setBio] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(true);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const fetchProfile = async () => {
     if (!targetId) return;
@@ -59,12 +63,56 @@ const Profile = () => {
       .eq("user_id", targetId)
       .order("created_at", { ascending: false });
     setPosts(postsData || []);
+
+    // Fetch follower/following counts
+    const { count: followers } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", targetId);
+    setFollowersCount(followers || 0);
+
+    const { count: following } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", targetId);
+    setFollowingCount(following || 0);
+
+    // Check if current user follows this profile
+    if (user && targetId !== user.id) {
+      const { data: followData } = await supabase
+        .from("follows")
+        .select("id")
+        .eq("follower_id", user.id)
+        .eq("following_id", targetId)
+        .maybeSingle();
+      setIsFollowing(!!followData);
+    }
+
     setLoading(false);
   };
 
   useEffect(() => {
     fetchProfile();
-  }, [targetId]);
+  }, [targetId, user]);
+
+  const handleFollow = async () => {
+    if (!user || !targetId) return;
+    setFollowLoading(true);
+    if (isFollowing) {
+      await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", user.id)
+        .eq("following_id", targetId);
+    } else {
+      await supabase
+        .from("follows")
+        .insert({ follower_id: user.id, following_id: targetId });
+    }
+    setIsFollowing(!isFollowing);
+    setFollowersCount((c) => (isFollowing ? c - 1 : c + 1));
+    setFollowLoading(false);
+  };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -157,13 +205,27 @@ const Profile = () => {
             ) : (
               <>
                 <h2 className="text-lg font-semibold text-foreground">{profile?.username}</h2>
-                <p className="text-sm text-muted-foreground mt-1">{profile?.bio || "No bio yet"}</p>
-                <p className="text-sm text-foreground mt-2 font-medium">{posts.length} posts</p>
-                {isOwnProfile && (
+                <div className="flex gap-4 mt-2 text-sm">
+                  <span><strong className="text-foreground">{posts.length}</strong> <span className="text-muted-foreground">posts</span></span>
+                  <span><strong className="text-foreground">{followersCount}</strong> <span className="text-muted-foreground">followers</span></span>
+                  <span><strong className="text-foreground">{followingCount}</strong> <span className="text-muted-foreground">following</span></span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">{profile?.bio || "No bio yet"}</p>
+                {isOwnProfile ? (
                   <Button size="sm" variant="outline" className="mt-3" onClick={() => setEditing(true)}>
                     Edit Profile
                   </Button>
-                )}
+                ) : user ? (
+                  <Button
+                    size="sm"
+                    variant={isFollowing ? "outline" : "default"}
+                    className="mt-3"
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                  >
+                    {isFollowing ? "Unfollow" : "Follow"}
+                  </Button>
+                ) : null}
               </>
             )}
           </div>
