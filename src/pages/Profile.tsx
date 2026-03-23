@@ -104,7 +104,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16">
       <Navbar />
       <main className="mx-auto max-w-xl px-4 py-6">
         {/* Profile header */}
