@@ -186,6 +186,7 @@ const Profile = () => {
           <p className="text-center text-muted-foreground py-10 text-sm">No posts yet</p>
         )}
       </main>
+      <BottomNav />
     </div>
   );
 };

@@ -110,6 +110,7 @@ const CreatePost = () => {
           </Button>
         </form>
       </main>
+      <BottomNav />
     </div>
   );
 };
