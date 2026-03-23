@@ -79,7 +79,7 @@ const PostCreator = ({ avatarUrl, username, onPostCreated }: PostCreatorProps) =
             type="text"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder="Start a thread..."
+            placeholder="Create a Post..."
             className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none py-2"
           />
           {preview && (
