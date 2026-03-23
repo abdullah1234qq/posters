@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ImagePlus, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import BottomNav from "@/components/BottomNav";
 
 const CreatePost = () => {
   const { user } = useAuth();
@@ -59,7 +60,7 @@ const CreatePost = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16">
       <Navbar />
       <main className="mx-auto max-w-xl px-4 py-6">
         <h1 className="text-xl font-semibold text-foreground mb-6">Create Post</h1>
@@ -109,6 +110,7 @@ const CreatePost = () => {
           </Button>
         </form>
       </main>
+      <BottomNav />
     </div>
   );
 };

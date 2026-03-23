@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import BottomNav from "@/components/BottomNav";
 
 interface Profile {
   id: string;
@@ -93,7 +94,7 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background pb-16">
         <Navbar />
         <div className="flex justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
@@ -103,7 +104,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16">
       <Navbar />
       <main className="mx-auto max-w-xl px-4 py-6">
         {/* Profile header */}
@@ -185,6 +186,7 @@ const Profile = () => {
           <p className="text-center text-muted-foreground py-10 text-sm">No posts yet</p>
         )}
       </main>
+      <BottomNav />
     </div>
   );
 };

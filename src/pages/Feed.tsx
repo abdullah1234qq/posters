@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import PostCard from "@/components/PostCard";
 import Navbar from "@/components/Navbar";
+import BottomNav from "@/components/BottomNav";
 
 interface Post {
   id: string;
@@ -46,7 +47,7 @@ const Feed = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16">
       <Navbar />
       <main className="mx-auto max-w-xl">
         {loading ? (
@@ -81,6 +82,7 @@ const Feed = () => {
           ))
         )}
       </main>
+      <BottomNav />
     </div>
   );
 };
