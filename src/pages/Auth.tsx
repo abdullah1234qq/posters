@@ -37,7 +37,7 @@ const Auth = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { username: username.toLowerCase().replace(/\s/g, '_') } },
+          options: { data: { username: username.toLowerCase().replace(/\s/g, '_'), bio: bio.trim() } },
         });
         if (error) throw error;
         toast({
