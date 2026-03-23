@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -35,7 +37,7 @@ const Auth = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { username: username.toLowerCase().replace(/\s/g, '_') } },
+          options: { data: { username: username.toLowerCase().replace(/\s/g, '_'), bio: bio.trim() } },
         });
         if (error) throw error;
         toast({
@@ -79,6 +81,20 @@ const Auth = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required={!isLogin}
+              />
+            </div>
+          )}
+          {!isLogin && (
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                placeholder="Tell us about yourself..."
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                maxLength={150}
+                className="resize-none"
+                rows={3}
               />
             </div>
           )}
