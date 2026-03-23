@@ -7,6 +7,7 @@ import Feed from "./pages/Feed";
 import Auth from "./pages/Auth";
 import CreatePost from "./pages/CreatePost";
 import Profile from "./pages/Profile";
+import Search from "./pages/Search";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
