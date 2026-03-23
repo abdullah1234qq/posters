@@ -84,6 +84,20 @@ const Auth = () => {
               />
             </div>
           )}
+          {!isLogin && (
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                placeholder="Tell us about yourself..."
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                maxLength={150}
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
