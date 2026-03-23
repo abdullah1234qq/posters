@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera } from "lucide-react";
-import Navbar from "@/components/Navbar";
-import BottomNav from "@/components/BottomNav";
+import { motion } from "framer-motion";
+import AppLayout from "@/components/AppLayout";
 
 interface Profile {
   id: string;
@@ -46,11 +46,7 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     if (!targetId) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", targetId)
-      .single();
+    const { data } = await supabase.from("profiles").select("*").eq("id", targetId).single();
     if (data) {
       setProfile(data);
       setBio(data.bio || "");
@@ -58,56 +54,36 @@ const Profile = () => {
     }
 
     const { data: postsData } = await supabase
-      .from("posts")
-      .select("id, media_url, media_type, caption")
-      .eq("user_id", targetId)
-      .order("created_at", { ascending: false });
+      .from("posts").select("id, media_url, media_type, caption")
+      .eq("user_id", targetId).order("created_at", { ascending: false });
     setPosts(postsData || []);
 
-    // Fetch follower/following counts
     const { count: followers } = await supabase
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("following_id", targetId);
+      .from("follows").select("*", { count: "exact", head: true }).eq("following_id", targetId);
     setFollowersCount(followers || 0);
 
     const { count: following } = await supabase
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("follower_id", targetId);
+      .from("follows").select("*", { count: "exact", head: true }).eq("follower_id", targetId);
     setFollowingCount(following || 0);
 
-    // Check if current user follows this profile
     if (user && targetId !== user.id) {
       const { data: followData } = await supabase
-        .from("follows")
-        .select("id")
-        .eq("follower_id", user.id)
-        .eq("following_id", targetId)
-        .maybeSingle();
+        .from("follows").select("id").eq("follower_id", user.id).eq("following_id", targetId).maybeSingle();
       setIsFollowing(!!followData);
     }
 
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, [targetId, user]);
+  useEffect(() => { fetchProfile(); }, [targetId, user]);
 
   const handleFollow = async () => {
     if (!user || !targetId) return;
     setFollowLoading(true);
     if (isFollowing) {
-      await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", user.id)
-        .eq("following_id", targetId);
+      await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", targetId);
     } else {
-      await supabase
-        .from("follows")
-        .insert({ follower_id: user.id, following_id: targetId });
+      await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId });
     }
     setIsFollowing(!isFollowing);
     setFollowersCount((c) => (isFollowing ? c - 1 : c + 1));
@@ -119,7 +95,6 @@ const Profile = () => {
     if (!file || !user) return;
     const ext = file.name.split(".").pop();
     const path = `${user.id}/avatar.${ext}`;
-
     await supabase.storage.from("media").upload(path, file, { upsert: true });
     const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
     await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
@@ -128,10 +103,7 @@ const Profile = () => {
 
   const handleSave = async () => {
     if (!user) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ bio, username })
-      .eq("id", user.id);
+    const { error } = await supabase.from("profiles").update({ bio, username }).eq("id", user.id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
@@ -142,25 +114,22 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pb-16">
-        <Navbar />
+      <AppLayout showRightSidebar={false}>
         <div className="flex justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-16">
-      <Navbar />
-      <main className="mx-auto max-w-xl px-4 py-6">
-        {/* Profile header */}
-        <div className="flex items-start gap-6 mb-8">
+    <AppLayout showRightSidebar={false}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-3xl p-6 shadow-card mb-6">
+        <div className="flex items-start gap-5">
           <div className="relative">
-            <Avatar className="h-20 w-20">
+            <Avatar className="h-20 w-20 ring-2 ring-primary/20">
               <AvatarImage src={profile?.avatar_url} />
-              <AvatarFallback className="bg-muted text-muted-foreground text-xl">
+              <AvatarFallback className="bg-secondary text-muted-foreground text-xl">
                 {profile?.username[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -168,58 +137,48 @@ const Profile = () => {
               <>
                 <button
                   onClick={() => fileRef.current?.click()}
-                  className="absolute bottom-0 right-0 rounded-full bg-primary p-1.5 text-primary-foreground shadow"
+                  className="absolute bottom-0 right-0 rounded-full gradient-warm p-1.5 text-primary-foreground shadow glow-sm"
                 >
                   <Camera className="h-3 w-3" />
                 </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
+                <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
               </>
             )}
           </div>
           <div className="flex-1">
             {editing ? (
-              <div className="space-y-2">
-                <Input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Username"
-                />
-                <Textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Bio"
-                  rows={2}
-                  maxLength={150}
-                />
+              <div className="space-y-3">
+                <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className="bg-secondary/50 border-border/50 rounded-xl" />
+                <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" rows={2} maxLength={150} className="bg-secondary/50 border-border/50 rounded-xl resize-none" />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleSave}>Save</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+                  <Button size="sm" onClick={handleSave} className="rounded-xl gradient-warm text-primary-foreground border-0">Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(false)} className="rounded-xl">Cancel</Button>
                 </div>
               </div>
             ) : (
               <>
-                <h2 className="text-lg font-semibold text-foreground">{profile?.username}</h2>
-                <div className="flex gap-4 mt-2 text-sm">
-                  <span><strong className="text-foreground">{posts.length}</strong> <span className="text-muted-foreground">posts</span></span>
-                  <span><strong className="text-foreground">{followersCount}</strong> <span className="text-muted-foreground">followers</span></span>
-                  <span><strong className="text-foreground">{followingCount}</strong> <span className="text-muted-foreground">following</span></span>
+                <h2 className="text-lg font-bold text-foreground font-display">{profile?.username}</h2>
+                <div className="flex gap-5 mt-3">
+                  {[
+                    { count: posts.length, label: "posts" },
+                    { count: followersCount, label: "followers" },
+                    { count: followingCount, label: "following" },
+                  ].map(({ count, label }) => (
+                    <div key={label} className="text-center">
+                      <p className="text-lg font-bold text-foreground">{count}</p>
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">{profile?.bio || "No bio yet"}</p>
+                <p className="text-sm text-muted-foreground mt-3">{profile?.bio || "No bio yet"}</p>
                 {isOwnProfile ? (
-                  <Button size="sm" variant="outline" className="mt-3" onClick={() => setEditing(true)}>
+                  <Button size="sm" variant="outline" className="mt-3 rounded-xl border-border/50" onClick={() => setEditing(true)}>
                     Edit Profile
                   </Button>
                 ) : user ? (
                   <Button
                     size="sm"
-                    variant={isFollowing ? "outline" : "default"}
-                    className="mt-3"
+                    className={`mt-3 rounded-xl border-0 ${isFollowing ? "bg-secondary text-foreground" : "gradient-warm text-primary-foreground"}`}
                     onClick={handleFollow}
                     disabled={followLoading}
                   >
@@ -230,26 +189,34 @@ const Profile = () => {
             )}
           </div>
         </div>
+      </motion.div>
 
-        {/* Post grid */}
-        <div className="grid grid-cols-3 gap-0.5">
-          {posts.map((post) => (
-            <div key={post.id} className="aspect-square bg-muted">
-              {post.media_type === "video" ? (
-                <video src={post.media_url} className="h-full w-full object-cover" />
-              ) : (
-                <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />
-              )}
-            </div>
-          ))}
+      {/* Post grid */}
+      <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
+        {posts.map((post, i) => (
+          <motion.div
+            key={post.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.05 }}
+            className="aspect-square bg-secondary group relative cursor-pointer"
+          >
+            {post.media_type === "video" ? (
+              <video src={post.media_url} className="h-full w-full object-cover" />
+            ) : (
+              <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />
+            )}
+            <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
+          </motion.div>
+        ))}
+      </div>
+
+      {posts.length === 0 && (
+        <div className="glass rounded-3xl py-16 text-center shadow-card">
+          <p className="text-muted-foreground text-sm">No posts yet</p>
         </div>
-
-        {posts.length === 0 && (
-          <p className="text-center text-muted-foreground py-10 text-sm">No posts yet</p>
-        )}
-      </main>
-      <BottomNav />
-    </div>
+      )}
+    </AppLayout>
   );
 };
 

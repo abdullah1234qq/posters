@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Camera } from "lucide-react";
+import { motion } from "framer-motion";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -28,78 +29,73 @@ const Auth = () => {
         if (error) throw error;
         navigate("/");
       } else {
-        if (!username.trim()) {
-          throw new Error("Username is required");
-        }
-        if (username.length < 3) {
-          throw new Error("Username must be at least 3 characters");
-        }
+        if (!username.trim()) throw new Error("Username is required");
+        if (username.length < 3) throw new Error("Username must be at least 3 characters");
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { username: username.toLowerCase().replace(/\s/g, '_'), bio: bio.trim() } },
         });
         if (error) throw error;
-        toast({
-          title: "Account created!",
-          description: "You can now sign in with your credentials.",
-        });
+        toast({ title: "Account created!", description: "You can now sign in with your credentials." });
         navigate("/");
       }
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex flex-col items-center space-y-2">
-          <div className="flex items-center gap-2">
-            <Camera className="h-8 w-8 text-foreground" />
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Snapgram</h1>
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-sm glass rounded-3xl p-8 shadow-glass"
+      >
+        <div className="flex flex-col items-center space-y-3 mb-8">
+          <div className="w-14 h-14 rounded-2xl gradient-warm flex items-center justify-center glow-primary">
+            <Camera className="h-7 w-7 text-primary-foreground" />
           </div>
-          <p className="text-sm text-muted-foreground">
-            {isLogin ? "Sign in to see photos from your friends." : "Sign up to share your moments."}
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-display">Snapgram</h1>
+          <p className="text-sm text-muted-foreground text-center">
+            {isLogin ? "Welcome back. Sign in to continue." : "Create an account to get started."}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="your_username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required={!isLogin}
-              />
-            </div>
-          )}
-          {!isLogin && (
-            <div className="space-y-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                placeholder="Tell us about yourself..."
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                maxLength={150}
-                className="resize-none"
-                rows={3}
-              />
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-xs text-muted-foreground uppercase tracking-wider">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="your_username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required={!isLogin}
+                  className="bg-secondary/50 border-border/50 rounded-xl focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bio" className="text-xs text-muted-foreground uppercase tracking-wider">Bio</Label>
+                <Textarea
+                  id="bio"
+                  placeholder="Tell us about yourself..."
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  maxLength={150}
+                  className="resize-none bg-secondary/50 border-border/50 rounded-xl"
+                  rows={2}
+                />
+              </div>
+            </>
           )}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-xs text-muted-foreground uppercase tracking-wider">Email</Label>
             <Input
               id="email"
               type="email"
@@ -107,10 +103,11 @@ const Auth = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="bg-secondary/50 border-border/50 rounded-xl focus:ring-primary"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-xs text-muted-foreground uppercase tracking-wider">Password</Label>
             <Input
               id="password"
               type="password"
@@ -119,23 +116,24 @@ const Auth = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              className="bg-secondary/50 border-border/50 rounded-xl focus:ring-primary"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full rounded-xl gradient-warm text-primary-foreground border-0 h-11 font-semibold" disabled={loading}>
             {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
           </Button>
         </form>
 
-        <div className="text-center">
+        <div className="text-center mt-6">
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

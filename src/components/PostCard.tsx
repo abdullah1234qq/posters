@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Heart, MessageCircle } from "lucide-react";
+import { Heart, MessageCircle, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { motion } from "framer-motion";
 
 interface Comment {
   id: string;
@@ -67,100 +68,107 @@ const PostCard = ({
   };
 
   return (
-    <article className="border-b border-border bg-card">
+    <motion.article
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass rounded-3xl overflow-hidden shadow-card mb-5"
+    >
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-3 px-5 py-4">
         <Link to={`/profile/${author.id}`}>
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-10 w-10 ring-2 ring-primary/20">
             <AvatarImage src={author.avatar_url} />
-            <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+            <AvatarFallback className="bg-secondary text-muted-foreground text-xs">
               {author.username[0]?.toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </Link>
-        <Link to={`/profile/${author.id}`} className="text-sm font-semibold text-foreground hover:opacity-70">
-          {author.username}
-        </Link>
+        <div className="flex-1">
+          <Link to={`/profile/${author.id}`} className="text-sm font-semibold text-foreground hover:opacity-70">
+            {author.username}
+          </Link>
+          <p className="text-[11px] text-muted-foreground">
+            {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
+          </p>
+        </div>
       </div>
 
+      {/* Caption above media */}
+      {caption && (
+        <div className="px-5 pb-3">
+          <p className="text-sm text-foreground/90 leading-relaxed">{caption}</p>
+        </div>
+      )}
+
       {/* Media */}
-      <div className="aspect-square w-full bg-muted">
+      <div className="mx-4 mb-4 rounded-2xl overflow-hidden bg-secondary">
         {mediaType === "video" ? (
-          <video src={mediaUrl} controls className="h-full w-full object-cover" />
+          <video src={mediaUrl} controls className="w-full object-cover max-h-[500px]" />
         ) : (
-          <img src={mediaUrl} alt={caption} className="h-full w-full object-cover" loading="lazy" />
+          <img src={mediaUrl} alt={caption} className="w-full object-cover max-h-[500px]" loading="lazy" />
         )}
       </div>
 
       {/* Actions */}
-      <div className="px-4 pt-3">
+      <div className="px-5 pb-2">
         <div className="flex items-center gap-4">
-          <button onClick={handleLike} className="transition-transform active:scale-90">
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={handleLike}
+            className="flex items-center gap-1.5 transition-colors"
+          >
             <Heart
-              className={`h-6 w-6 transition-colors ${
-                liked ? "fill-like text-like animate-heart-pop" : "text-foreground"
+              className={`h-5 w-5 transition-all ${
+                liked ? "fill-like text-like animate-heart-pop" : "text-muted-foreground hover:text-foreground"
               }`}
             />
-          </button>
-          <label htmlFor={`comment-${id}`} className="cursor-pointer">
-            <MessageCircle className="h-6 w-6 text-foreground" />
+            <span className={`text-sm font-medium ${liked ? "text-like" : "text-muted-foreground"}`}>
+              {likes}
+            </span>
+          </motion.button>
+          <label htmlFor={`comment-${id}`} className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+            <MessageCircle className="h-5 w-5" />
+            <span className="text-sm font-medium">{comments.length}</span>
           </label>
         </div>
-
-        {/* Likes count */}
-        <p className="mt-2 text-sm font-semibold text-foreground">
-          {likes} {likes === 1 ? "like" : "likes"}
-        </p>
-
-        {/* Caption */}
-        {caption && (
-          <p className="mt-1 text-sm text-foreground">
-            <span className="font-semibold">{author.username}</span>{" "}
-            {caption}
-          </p>
-        )}
-
-        {/* Comments */}
-        {comments.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {comments.slice(0, 3).map((c) => (
-              <p key={c.id} className="text-sm text-foreground">
-                <span className="font-semibold">{c.profiles?.username}</span>{" "}
-                {c.text}
-              </p>
-            ))}
-            {comments.length > 3 && (
-              <p className="text-xs text-muted-foreground">
-                View all {comments.length} comments
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Timestamp */}
-        <p className="mt-1 text-[10px] uppercase text-muted-foreground">
-          {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
-        </p>
       </div>
 
+      {/* Comments */}
+      {comments.length > 0 && (
+        <div className="px-5 pb-2 space-y-1.5">
+          {comments.slice(0, 2).map((c) => (
+            <p key={c.id} className="text-sm text-foreground/80">
+              <span className="font-semibold text-foreground">{c.profiles?.username}</span>{" "}
+              {c.text}
+            </p>
+          ))}
+          {comments.length > 2 && (
+            <p className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+              View all {comments.length} comments
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Comment input */}
-      <form onSubmit={handleComment} className="flex items-center border-t border-border px-4 py-2 mt-2">
+      <form onSubmit={handleComment} className="flex items-center gap-2 px-5 py-3 border-t border-border/30">
         <Input
           id={`comment-${id}`}
           value={commentText}
           onChange={(e) => setCommentText(e.target.value)}
           placeholder="Add a comment..."
-          className="flex-1 border-0 bg-transparent text-sm focus-visible:ring-0 px-0"
+          className="flex-1 border-0 bg-transparent text-sm focus-visible:ring-0 px-0 placeholder:text-muted-foreground/50"
         />
-        <button
+        <motion.button
+          whileTap={{ scale: 0.9 }}
           type="submit"
           disabled={!commentText.trim() || submitting}
-          className="text-sm font-semibold text-primary disabled:opacity-30 ml-2"
+          className="text-primary disabled:opacity-30 transition-opacity"
         >
-          Post
-        </button>
+          <Send className="h-4 w-4" />
+        </motion.button>
       </form>
-    </article>
+    </motion.article>
   );
 };
 
