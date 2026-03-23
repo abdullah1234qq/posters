@@ -1,24 +1,16 @@
 import { Link } from "react-router-dom";
-import { Camera, LogOut } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { Camera } from "lucide-react";
 
 const Navbar = () => {
-  const { signOut } = useAuth();
-
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-card">
-      <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2">
-          <Camera className="h-6 w-6 text-foreground" />
-          <span className="text-lg font-semibold text-foreground">Snapgram</span>
+    <header className="sticky top-0 z-50 glass-strong">
+      <div className="mx-auto flex h-14 max-w-5xl items-center px-4 lg:pl-24">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl gradient-warm flex items-center justify-center glow-sm">
+            <Camera className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <span className="text-lg font-bold text-foreground font-display tracking-tight">Snapgram</span>
         </Link>
-        <button
-          onClick={signOut}
-          className="rounded-lg p-2.5 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Logout"
-        >
-          <LogOut className="h-5 w-5" />
-        </button>
       </div>
     </header>
   );
