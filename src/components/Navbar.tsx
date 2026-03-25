@@ -24,7 +24,7 @@ const Navbar = () => {
           <div className="w-8 h-8 rounded-xl gradient-warm flex items-center justify-center glow-sm">
             <Camera className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="text-lg font-bold text-foreground font-display tracking-tight">Snapgram</span>
+          <span className="text-lg font-bold text-foreground font-display tracking-tight"><span className="text-lg font-bold text-foreground font-display tracking-tight">Posters</span></span>
         </Link>
 
         {/* Theme Switcher */}
