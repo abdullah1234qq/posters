@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import FollowListDialog from "@/components/FollowListDialog";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,6 +44,8 @@ const Profile = () => {
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [followDialogType, setFollowDialogType] = useState<"followers" | "following">("followers");
+  const [followDialogOpen, setFollowDialogOpen] = useState(false);
 
   const fetchProfile = async () => {
     if (!targetId) return;
@@ -159,16 +162,24 @@ const Profile = () => {
               <>
                 <h2 className="text-lg font-bold text-foreground font-display">{profile?.username}</h2>
                 <div className="flex gap-5 mt-3">
-                  {[
-                    { count: posts.length, label: "posts" },
-                    { count: followersCount, label: "followers" },
-                    { count: followingCount, label: "following" },
-                  ].map(({ count, label }) => (
-                    <div key={label} className="text-center">
-                      <p className="text-lg font-bold text-foreground">{count}</p>
-                      <p className="text-xs text-muted-foreground">{label}</p>
-                    </div>
-                  ))}
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-foreground">{posts.length}</p>
+                    <p className="text-xs text-muted-foreground">posts</p>
+                  </div>
+                  <button
+                    onClick={() => { setFollowDialogType("followers"); setFollowDialogOpen(true); }}
+                    className="text-center hover:opacity-70 transition-opacity"
+                  >
+                    <p className="text-lg font-bold text-foreground">{followersCount}</p>
+                    <p className="text-xs text-muted-foreground">followers</p>
+                  </button>
+                  <button
+                    onClick={() => { setFollowDialogType("following"); setFollowDialogOpen(true); }}
+                    className="text-center hover:opacity-70 transition-opacity"
+                  >
+                    <p className="text-lg font-bold text-foreground">{followingCount}</p>
+                    <p className="text-xs text-muted-foreground">following</p>
+                  </button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-3">{profile?.bio || "No bio yet"}</p>
                 {isOwnProfile ? (
@@ -215,6 +226,15 @@ const Profile = () => {
         <div className="glass rounded-3xl py-16 text-center shadow-card">
           <p className="text-muted-foreground text-sm">No posts yet</p>
         </div>
+      )}
+
+      {targetId && (
+        <FollowListDialog
+          open={followDialogOpen}
+          onOpenChange={setFollowDialogOpen}
+          userId={targetId}
+          type={followDialogType}
+        />
       )}
     </AppLayout>
   );
