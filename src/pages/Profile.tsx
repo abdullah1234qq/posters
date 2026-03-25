@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import FollowListDialog from "@/components/FollowListDialog";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
