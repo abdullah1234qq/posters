@@ -227,6 +227,15 @@ const Profile = () => {
           <p className="text-muted-foreground text-sm">No posts yet</p>
         </div>
       )}
+
+      {targetId && (
+        <FollowListDialog
+          open={followDialogOpen}
+          onOpenChange={setFollowDialogOpen}
+          userId={targetId}
+          type={followDialogType}
+        />
+      )}
     </AppLayout>
   );
 };
