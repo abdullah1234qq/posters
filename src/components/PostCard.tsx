@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Heart, MessageCircle, Send } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, Repeat2, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,6 +25,9 @@ interface PostCardProps {
   author: { username: string; avatar_url: string; id: string };
   likesCount: number;
   isLiked: boolean;
+  isSaved?: boolean;
+  isReposted?: boolean;
+  repostsCount?: number;
   comments: Comment[];
   onLikeToggle: () => void;
   onCommentAdded: () => void;
@@ -31,26 +35,76 @@ interface PostCardProps {
 
 const PostCard = ({
   id, mediaUrl, mediaType, caption, createdAt,
-  author, likesCount, isLiked, comments, onLikeToggle, onCommentAdded,
+  author, likesCount, isLiked, isSaved = false, isReposted = false,
+  repostsCount = 0, comments, onLikeToggle, onCommentAdded,
 }: PostCardProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [liked, setLiked] = useState(isLiked);
   const [likes, setLikes] = useState(likesCount);
+  const [saved, setSaved] = useState(isSaved);
+  const [reposted, setReposted] = useState(isReposted);
+  const [reposts, setReposts] = useState(repostsCount);
 
   const handleLike = async () => {
     if (!user) return;
     const wasLiked = liked;
     setLiked(!wasLiked);
     setLikes((prev) => (wasLiked ? prev - 1 : prev + 1));
-
     if (wasLiked) {
       await supabase.from("likes").delete().eq("post_id", id).eq("user_id", user.id);
     } else {
       await supabase.from("likes").insert({ post_id: id, user_id: user.id });
     }
     onLikeToggle();
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+    const wasSaved = saved;
+    setSaved(!wasSaved);
+    if (wasSaved) {
+      await supabase.from("saved_posts").delete().eq("post_id", id).eq("user_id", user.id);
+      toast({ title: "Removed from saved" });
+    } else {
+      await supabase.from("saved_posts").insert({ post_id: id, user_id: user.id });
+      toast({ title: "Post saved!" });
+    }
+  };
+
+  const handleRepost = async () => {
+    if (!user) return;
+    const wasReposted = reposted;
+    setReposted(!wasReposted);
+    setReposts((prev) => (wasReposted ? prev - 1 : prev + 1));
+    if (wasReposted) {
+      await supabase.from("reposts").delete().eq("post_id", id).eq("user_id", user.id);
+      toast({ title: "Repost removed" });
+    } else {
+      await supabase.from("reposts").insert({ post_id: id, user_id: user.id });
+      toast({ title: "Reposted!" });
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(mediaUrl);
+      const blob = await response.blob();
+      const ext = mediaType === "video" ? "mp4" : "jpg";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `post_${id}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Download started!" });
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
   };
 
   const handleComment = async (e: React.FormEvent) => {
@@ -111,25 +165,38 @@ const PostCard = ({
 
       {/* Actions */}
       <div className="px-5 pb-2">
-        <div className="flex items-center gap-4">
-          <motion.button
-            whileTap={{ scale: 0.85 }}
-            onClick={handleLike}
-            className="flex items-center gap-1.5 transition-colors"
-          >
-            <Heart
-              className={`h-5 w-5 transition-all ${
-                liked ? "fill-like text-like animate-heart-pop" : "text-muted-foreground hover:text-foreground"
-              }`}
-            />
-            <span className={`text-sm font-medium ${liked ? "text-like" : "text-muted-foreground"}`}>
-              {likes}
-            </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Like */}
+            <motion.button whileTap={{ scale: 0.85 }} onClick={handleLike} className="flex items-center gap-1.5 transition-colors">
+              <Heart className={`h-5 w-5 transition-all ${liked ? "fill-like text-like animate-heart-pop" : "text-muted-foreground hover:text-foreground"}`} />
+              <span className={`text-sm font-medium ${liked ? "text-like" : "text-muted-foreground"}`}>{likes}</span>
+            </motion.button>
+
+            {/* Comment */}
+            <label htmlFor={`comment-${id}`} className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+              <MessageCircle className="h-5 w-5" />
+              <span className="text-sm font-medium">{comments.length}</span>
+            </label>
+
+            {/* Repost */}
+            <motion.button whileTap={{ scale: 0.85 }} onClick={handleRepost} className="flex items-center gap-1.5 transition-colors">
+              <Repeat2 className={`h-5 w-5 transition-all ${reposted ? "text-green-500" : "text-muted-foreground hover:text-foreground"}`} />
+              {reposts > 0 && (
+                <span className={`text-sm font-medium ${reposted ? "text-green-500" : "text-muted-foreground"}`}>{reposts}</span>
+              )}
+            </motion.button>
+
+            {/* Download */}
+            <motion.button whileTap={{ scale: 0.85 }} onClick={handleDownload} className="text-muted-foreground hover:text-foreground transition-colors">
+              <Download className="h-5 w-5" />
+            </motion.button>
+          </div>
+
+          {/* Save */}
+          <motion.button whileTap={{ scale: 0.85 }} onClick={handleSave} className="transition-colors">
+            <Bookmark className={`h-5 w-5 transition-all ${saved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`} />
           </motion.button>
-          <label htmlFor={`comment-${id}`} className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
-            <MessageCircle className="h-5 w-5" />
-            <span className="text-sm font-medium">{comments.length}</span>
-          </label>
         </div>
       </div>
 

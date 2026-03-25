@@ -20,11 +20,13 @@ interface Post {
     created_at: string;
     profiles: { username: string; avatar_url: string } | null;
   }[];
+  reposts: { user_id: string }[];
 }
 
 const Feed = () => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [savedPostIds, setSavedPostIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<{ username: string; avatar_url: string } | null>(null);
 
@@ -35,11 +37,22 @@ const Feed = () => {
         id, media_url, media_type, caption, created_at, user_id,
         profiles(id, username, avatar_url),
         likes(user_id),
-        comments(id, text, created_at, profiles(username, avatar_url))
+        comments(id, text, created_at, profiles(username, avatar_url)),
+        reposts(user_id)
       `)
       .order("created_at", { ascending: false });
 
     setPosts((data as any) || []);
+
+    // Fetch saved posts for current user
+    if (user) {
+      const { data: saved } = await supabase
+        .from("saved_posts")
+        .select("post_id")
+        .eq("user_id", user.id);
+      setSavedPostIds(new Set((saved || []).map((s: any) => s.post_id)));
+    }
+
     setLoading(false);
   };
 
@@ -84,6 +97,9 @@ const Feed = () => {
             }}
             likesCount={post.likes?.length || 0}
             isLiked={post.likes?.some((l) => l.user_id === user?.id) || false}
+            isSaved={savedPostIds.has(post.id)}
+            isReposted={post.reposts?.some((r) => r.user_id === user?.id) || false}
+            repostsCount={post.reposts?.length || 0}
             comments={post.comments || []}
             onLikeToggle={fetchPosts}
             onCommentAdded={fetchPosts}
