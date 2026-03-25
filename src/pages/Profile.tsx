@@ -162,16 +162,24 @@ const Profile = () => {
               <>
                 <h2 className="text-lg font-bold text-foreground font-display">{profile?.username}</h2>
                 <div className="flex gap-5 mt-3">
-                  {[
-                    { count: posts.length, label: "posts" },
-                    { count: followersCount, label: "followers" },
-                    { count: followingCount, label: "following" },
-                  ].map(({ count, label }) => (
-                    <div key={label} className="text-center">
-                      <p className="text-lg font-bold text-foreground">{count}</p>
-                      <p className="text-xs text-muted-foreground">{label}</p>
-                    </div>
-                  ))}
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-foreground">{posts.length}</p>
+                    <p className="text-xs text-muted-foreground">posts</p>
+                  </div>
+                  <button
+                    onClick={() => { setFollowDialogType("followers"); setFollowDialogOpen(true); }}
+                    className="text-center hover:opacity-70 transition-opacity"
+                  >
+                    <p className="text-lg font-bold text-foreground">{followersCount}</p>
+                    <p className="text-xs text-muted-foreground">followers</p>
+                  </button>
+                  <button
+                    onClick={() => { setFollowDialogType("following"); setFollowDialogOpen(true); }}
+                    className="text-center hover:opacity-70 transition-opacity"
+                  >
+                    <p className="text-lg font-bold text-foreground">{followingCount}</p>
+                    <p className="text-xs text-muted-foreground">following</p>
+                  </button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-3">{profile?.bio || "No bio yet"}</p>
                 {isOwnProfile ? (
