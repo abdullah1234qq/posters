@@ -247,6 +247,7 @@ const Profile = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.05 }}
+                  onClick={() => setSelectedPost(post)}
                   className="aspect-square bg-secondary group relative cursor-pointer"
                 >
                   {post.media_type === "video" ? (
@@ -274,6 +275,7 @@ const Profile = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.05 }}
+                  onClick={() => setSelectedPost(post)}
                   className="aspect-square bg-secondary group relative cursor-pointer"
                 >
                   {post.media_type === "video" ? (
@@ -288,6 +290,28 @@ const Profile = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Post preview dialog */}
+      <Dialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-3xl border-border/30 bg-background">
+          {selectedPost && (
+            <div>
+              <div className="bg-secondary">
+                {selectedPost.media_type === "video" ? (
+                  <video src={selectedPost.media_url} controls autoPlay className="w-full max-h-[70vh] object-contain" />
+                ) : (
+                  <img src={selectedPost.media_url} alt={selectedPost.caption} className="w-full max-h-[70vh] object-contain" />
+                )}
+              </div>
+              {selectedPost.caption && (
+                <div className="p-5">
+                  <p className="text-sm text-foreground/90 leading-relaxed">{selectedPost.caption}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {targetId && (
         <FollowListDialog
