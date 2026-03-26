@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera } from "lucide-react";
+import { Camera, Grid3X3, Repeat2 } from "lucide-react";
 import { motion } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
   id: string;
@@ -26,6 +27,12 @@ interface Post {
   caption: string;
 }
 
+interface RepostWithPost {
+  id: string;
+  post_id: string;
+  posts: Post | null;
+}
+
 const Profile = () => {
   const { userId } = useParams();
   const { user } = useAuth();
@@ -36,6 +43,7 @@ const Profile = () => {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [reposts, setReposts] = useState<Post[]>([]);
   const [editing, setEditing] = useState(false);
   const [bio, setBio] = useState("");
   const [username, setUsername] = useState("");
@@ -60,6 +68,17 @@ const Profile = () => {
       .from("posts").select("id, media_url, media_type, caption")
       .eq("user_id", targetId).order("created_at", { ascending: false });
     setPosts(postsData || []);
+
+    const { data: repostsData } = await supabase
+      .from("reposts")
+      .select("id, post_id, posts(id, media_url, media_type, caption)")
+      .eq("user_id", targetId)
+      .order("created_at", { ascending: false });
+    setReposts(
+      ((repostsData as any) || [])
+        .map((r: any) => r.posts)
+        .filter(Boolean) as Post[]
+    );
 
     const { count: followers } = await supabase
       .from("follows").select("*", { count: "exact", head: true }).eq("following_id", targetId);
@@ -202,31 +221,71 @@ const Profile = () => {
         </div>
       </motion.div>
 
-      {/* Post grid */}
-      <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
-        {posts.map((post, i) => (
-          <motion.div
-            key={post.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: i * 0.05 }}
-            className="aspect-square bg-secondary group relative cursor-pointer"
-          >
-            {post.media_type === "video" ? (
-              <video src={post.media_url} className="h-full w-full object-cover" />
-            ) : (
-              <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />
-            )}
-            <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
-          </motion.div>
-        ))}
-      </div>
+      {/* Posts & Reposts Tabs */}
+      <Tabs defaultValue="posts" className="w-full">
+        <TabsList className="w-full glass rounded-2xl mb-4">
+          <TabsTrigger value="posts" className="flex-1 gap-2 rounded-xl">
+            <Grid3X3 className="h-4 w-4" /> Posts
+          </TabsTrigger>
+          <TabsTrigger value="reposts" className="flex-1 gap-2 rounded-xl">
+            <Repeat2 className="h-4 w-4" /> Reposts
+          </TabsTrigger>
+        </TabsList>
 
-      {posts.length === 0 && (
-        <div className="glass rounded-3xl py-16 text-center shadow-card">
-          <p className="text-muted-foreground text-sm">No posts yet</p>
-        </div>
-      )}
+        <TabsContent value="posts">
+          {posts.length === 0 ? (
+            <div className="glass rounded-3xl py-16 text-center shadow-card">
+              <p className="text-muted-foreground text-sm">No posts yet</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
+              {posts.map((post, i) => (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="aspect-square bg-secondary group relative cursor-pointer"
+                >
+                  {post.media_type === "video" ? (
+                    <video src={post.media_url} className="h-full w-full object-cover" />
+                  ) : (
+                    <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />
+                  )}
+                  <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="reposts">
+          {reposts.length === 0 ? (
+            <div className="glass rounded-3xl py-16 text-center shadow-card">
+              <p className="text-muted-foreground text-sm">No reposts yet</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
+              {reposts.map((post, i) => (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="aspect-square bg-secondary group relative cursor-pointer"
+                >
+                  {post.media_type === "video" ? (
+                    <video src={post.media_url} className="h-full w-full object-cover" />
+                  ) : (
+                    <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />
+                  )}
+                  <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {targetId && (
         <FollowListDialog
