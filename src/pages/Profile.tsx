@@ -69,6 +69,17 @@ const Profile = () => {
       .eq("user_id", targetId).order("created_at", { ascending: false });
     setPosts(postsData || []);
 
+    const { data: repostsData } = await supabase
+      .from("reposts")
+      .select("id, post_id, posts(id, media_url, media_type, caption)")
+      .eq("user_id", targetId)
+      .order("created_at", { ascending: false });
+    setReposts(
+      ((repostsData as any) || [])
+        .map((r: any) => r.posts)
+        .filter(Boolean) as Post[]
+    );
+
     const { count: followers } = await supabase
       .from("follows").select("*", { count: "exact", head: true }).eq("following_id", targetId);
     setFollowersCount(followers || 0);
