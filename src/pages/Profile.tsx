@@ -55,6 +55,7 @@ const Profile = () => {
   const [followLoading, setFollowLoading] = useState(false);
   const [followDialogType, setFollowDialogType] = useState<"followers" | "following">("followers");
   const [followDialogOpen, setFollowDialogOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   const fetchProfile = async () => {
     if (!targetId) return;
