@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera } from "lucide-react";
+import { Camera, Grid3X3, Repeat2 } from "lucide-react";
 import { motion } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
   id: string;
@@ -24,6 +25,12 @@ interface Post {
   media_url: string;
   media_type: string;
   caption: string;
+}
+
+interface RepostWithPost {
+  id: string;
+  post_id: string;
+  posts: Post | null;
 }
 
 const Profile = () => {
