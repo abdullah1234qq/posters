@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Camera } from "lucide-react";
 import { motion } from "framer-motion";
+import { lovable } from "@/integrations/lovable/index";
+import { Separator } from "@/components/ui/separator";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
