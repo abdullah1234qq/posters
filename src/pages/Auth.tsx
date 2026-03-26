@@ -59,7 +59,7 @@ const Auth = () => {
           <div className="w-14 h-14 rounded-2xl gradient-warm flex items-center justify-center glow-primary">
             <Camera className="h-7 w-7 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground font-display">Snapgram</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-display">Posters</h1>
           <p className="text-sm text-muted-foreground text-center">
             {isLogin ? "Welcome back. Sign in to continue." : "Create an account to get started."}
           </p>
