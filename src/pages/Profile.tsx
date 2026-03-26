@@ -43,6 +43,7 @@ const Profile = () => {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [reposts, setReposts] = useState<Post[]>([]);
   const [editing, setEditing] = useState(false);
   const [bio, setBio] = useState("");
   const [username, setUsername] = useState("");
