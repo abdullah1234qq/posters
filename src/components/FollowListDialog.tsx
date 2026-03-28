@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/config";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,31 +28,23 @@ const FollowListDialog = ({ open, onOpenChange, userId, type }: FollowListDialog
     if (!open) return;
     const fetchUsers = async () => {
       setLoading(true);
-      if (type === "followers") {
-        const { data } = await supabase
-          .from("follows")
-          .select("follower_id, profiles!follows_follower_id_fkey(id, username, avatar_url)")
-          .eq("following_id", userId);
-        setUsers(
-          (data || []).map((row: any) => ({
-            id: row.profiles.id,
-            username: row.profiles.username,
-            avatar_url: row.profiles.avatar_url,
-          }))
-        );
-      } else {
-        const { data } = await supabase
-          .from("follows")
-          .select("following_id, profiles!follows_following_id_fkey(id, username, avatar_url)")
-          .eq("follower_id", userId);
-        setUsers(
-          (data || []).map((row: any) => ({
-            id: row.profiles.id,
-            username: row.profiles.username,
-            avatar_url: row.profiles.avatar_url,
-          }))
-        );
+      const field = type === "followers" ? "following_id" : "follower_id";
+      const targetField = type === "followers" ? "follower_id" : "following_id";
+
+      const followsSnap = await getDocs(
+        query(collection(db, "follows"), where(field, "==", userId))
+      );
+
+      const usersList: FollowUser[] = [];
+      for (const followDoc of followsSnap.docs) {
+        const targetUserId = followDoc.data()[targetField];
+        const profileSnap = await getDoc(doc(db, "profiles", targetUserId));
+        if (profileSnap.exists()) {
+          const data = profileSnap.data();
+          usersList.push({ id: targetUserId, username: data.username, avatar_url: data.avatar_url });
+        }
       }
+      setUsers(usersList);
       setLoading(false);
     };
     fetchUsers();

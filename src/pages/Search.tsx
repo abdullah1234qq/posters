@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/config";
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,19 +21,19 @@ interface PostResult {
   media_type: string;
   caption: string | null;
   user_id: string;
-  profiles: { username: string; avatar_url: string | null } | null;
+  profileUsername?: string;
 }
 
 const Search = () => {
   const { user } = useAuth();
-  const [query, setQuery] = useState("");
+  const [queryText, setQueryText] = useState("");
   const [users, setUsers] = useState<ProfileResult[]>([]);
   const [posts, setPosts] = useState<PostResult[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async (value: string) => {
-    setQuery(value);
+    setQueryText(value);
     if (value.trim().length < 2) {
       setUsers([]);
       setPosts([]);
@@ -43,13 +44,36 @@ const Search = () => {
     setLoading(true);
     setSearched(true);
 
-    const [usersRes, postsRes] = await Promise.all([
-      supabase.from("profiles").select("id, username, avatar_url, bio").ilike("username", `%${value.trim()}%`).limit(10),
-      supabase.from("posts").select("id, media_url, media_type, caption, user_id, profiles(username, avatar_url)").ilike("caption", `%${value.trim()}%`).limit(12),
-    ]);
+    const searchTerm = value.trim().toLowerCase();
 
-    setUsers((usersRes.data as ProfileResult[]) || []);
-    setPosts((postsRes.data as PostResult[]) || []);
+    // Search profiles - Firestore doesn't support ILIKE, so we do range query
+    const profilesSnap = await getDocs(
+      query(
+        collection(db, "profiles"),
+        where("username", ">=", searchTerm),
+        where("username", "<=", searchTerm + "\uf8ff"),
+        limit(10)
+      )
+    );
+    const profileResults: ProfileResult[] = profilesSnap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    } as any));
+
+    // For posts, we fetch recent posts and filter client-side (Firestore lacks full-text search)
+    const postsSnap = await getDocs(
+      query(collection(db, "posts"), orderBy("created_at", "desc"), limit(50))
+    );
+    const postResults: PostResult[] = postsSnap.docs
+      .filter((d) => {
+        const caption = (d.data().caption || "").toLowerCase();
+        return caption.includes(searchTerm);
+      })
+      .slice(0, 12)
+      .map((d) => ({ id: d.id, ...d.data() } as any));
+
+    setUsers(profileResults);
+    setPosts(postResults);
     setLoading(false);
   };
 
@@ -58,7 +82,7 @@ const Search = () => {
       <div className="relative mb-6">
         <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          value={query}
+          value={queryText}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search users or posts..."
           className="pl-11 bg-secondary/50 border-border/50 rounded-2xl h-12"
@@ -81,7 +105,7 @@ const Search = () => {
                 {users.map((u) => (
                   <Link
                     key={u.id}
-                    to={u.id === user?.id ? "/profile" : `/profile/${u.id}`}
+                    to={u.id === user?.uid ? "/profile" : `/profile/${u.id}`}
                     className="flex items-center gap-3 rounded-2xl p-3 hover:bg-secondary/50 transition-colors"
                   >
                     <Avatar className="h-10 w-10">
@@ -112,7 +136,7 @@ const Search = () => {
                       <img src={p.media_url} alt={p.caption || ""} className="h-full w-full object-cover" loading="lazy" />
                     )}
                     <div className="absolute inset-0 bg-background/0 group-hover:bg-background/40 transition-colors flex items-end p-2 opacity-0 group-hover:opacity-100">
-                      <p className="text-[10px] text-foreground font-medium truncate">@{p.profiles?.username}</p>
+                      <p className="text-[10px] text-foreground font-medium truncate">{p.caption}</p>
                     </div>
                   </div>
                 ))}

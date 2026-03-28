@@ -1,15 +1,17 @@
 import { useEffect, useState, useRef } from "react";
 import FollowListDialog from "@/components/FollowListDialog";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { db, storage } from "@/integrations/firebase/config";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Grid3X3, Repeat2, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Camera, Grid3X3, Repeat2 } from "lucide-react";
+import { motion } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -28,19 +30,13 @@ interface Post {
   caption: string;
 }
 
-interface RepostWithPost {
-  id: string;
-  post_id: string;
-  posts: Post | null;
-}
-
 const Profile = () => {
   const { userId } = useParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const targetId = userId || user?.id;
-  const isOwnProfile = !userId || userId === user?.id;
+  const targetId = userId || user?.uid;
+  const isOwnProfile = !userId || userId === user?.uid;
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -59,41 +55,51 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     if (!targetId) return;
-    const { data } = await supabase.from("profiles").select("*").eq("id", targetId).single();
-    if (data) {
-      setProfile(data);
-      setBio(data.bio || "");
-      setUsername(data.username || "");
+
+    // Profile
+    const profileSnap = await getDoc(doc(db, "profiles", targetId));
+    if (profileSnap.exists()) {
+      const data = profileSnap.data();
+      const p = { id: targetId, username: data.username, bio: data.bio || "", avatar_url: data.avatar_url || "" };
+      setProfile(p);
+      setBio(p.bio);
+      setUsername(p.username);
     }
 
-    const { data: postsData } = await supabase
-      .from("posts").select("id, media_url, media_type, caption")
-      .eq("user_id", targetId).order("created_at", { ascending: false });
-    setPosts(postsData || []);
+    // Posts
+    const postsQuery = query(collection(db, "posts"), where("user_id", "==", targetId), orderBy("created_at", "desc"));
+    const postsSnap = await getDocs(postsQuery);
+    setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
 
-    const { data: repostsData } = await supabase
-      .from("reposts")
-      .select("id, post_id, posts(id, media_url, media_type, caption)")
-      .eq("user_id", targetId)
-      .order("created_at", { ascending: false });
-    setReposts(
-      ((repostsData as any) || [])
-        .map((r: any) => r.posts)
-        .filter(Boolean) as Post[]
-    );
+    // Reposts - from user's reposts subcollection
+    const repostsSnap = await getDocs(collection(db, "users", targetId, "reposts"));
+    const repostPosts: Post[] = [];
+    for (const rDoc of repostsSnap.docs) {
+      const postId = rDoc.data().post_id;
+      const postSnap = await getDoc(doc(db, "posts", postId));
+      if (postSnap.exists()) {
+        repostPosts.push({ id: postSnap.id, ...postSnap.data() } as any);
+      }
+    }
+    setReposts(repostPosts);
 
-    const { count: followers } = await supabase
-      .from("follows").select("*", { count: "exact", head: true }).eq("following_id", targetId);
-    setFollowersCount(followers || 0);
+    // Followers count
+    const followersSnap = await getDocs(query(collection(db, "follows"), where("following_id", "==", targetId)));
+    setFollowersCount(followersSnap.size);
 
-    const { count: following } = await supabase
-      .from("follows").select("*", { count: "exact", head: true }).eq("follower_id", targetId);
-    setFollowingCount(following || 0);
+    // Following count
+    const followingSnap = await getDocs(query(collection(db, "follows"), where("follower_id", "==", targetId)));
+    setFollowingCount(followingSnap.size);
 
-    if (user && targetId !== user.id) {
-      const { data: followData } = await supabase
-        .from("follows").select("id").eq("follower_id", user.id).eq("following_id", targetId).maybeSingle();
-      setIsFollowing(!!followData);
+    // Is following
+    if (user && targetId !== user.uid) {
+      const followQuery = query(
+        collection(db, "follows"),
+        where("follower_id", "==", user.uid),
+        where("following_id", "==", targetId)
+      );
+      const followSnap = await getDocs(followQuery);
+      setIsFollowing(!followSnap.empty);
     }
 
     setLoading(false);
@@ -104,10 +110,12 @@ const Profile = () => {
   const handleFollow = async () => {
     if (!user || !targetId) return;
     setFollowLoading(true);
+    const followId = `${user.uid}_${targetId}`;
+    const followRef = doc(db, "follows", followId);
     if (isFollowing) {
-      await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", targetId);
+      await deleteDoc(followRef);
     } else {
-      await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId });
+      await setDoc(followRef, { follower_id: user.uid, following_id: targetId, created_at: serverTimestamp() });
     }
     setIsFollowing(!isFollowing);
     setFollowersCount((c) => (isFollowing ? c - 1 : c + 1));
@@ -118,21 +126,22 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     const ext = file.name.split(".").pop();
-    const path = `${user.id}/avatar.${ext}`;
-    await supabase.storage.from("media").upload(path, file, { upsert: true });
-    const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
-    await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
+    const path = `avatars/${user.uid}/avatar.${ext}`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    const publicUrl = await getDownloadURL(storageRef);
+    await updateDoc(doc(db, "profiles", user.uid), { avatar_url: publicUrl, updated_at: serverTimestamp() });
     fetchProfile();
   };
 
   const handleSave = async () => {
     if (!user) return;
-    const { error } = await supabase.from("profiles").update({ bio, username }).eq("id", user.id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await updateDoc(doc(db, "profiles", user.uid), { bio, username, updated_at: serverTimestamp() });
       setEditing(false);
       fetchProfile();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -187,17 +196,11 @@ const Profile = () => {
                     <p className="text-lg font-bold text-foreground">{posts.length}</p>
                     <p className="text-xs text-muted-foreground">posts</p>
                   </div>
-                  <button
-                    onClick={() => { setFollowDialogType("followers"); setFollowDialogOpen(true); }}
-                    className="text-center hover:opacity-70 transition-opacity"
-                  >
+                  <button onClick={() => { setFollowDialogType("followers"); setFollowDialogOpen(true); }} className="text-center hover:opacity-70 transition-opacity">
                     <p className="text-lg font-bold text-foreground">{followersCount}</p>
                     <p className="text-xs text-muted-foreground">followers</p>
                   </button>
-                  <button
-                    onClick={() => { setFollowDialogType("following"); setFollowDialogOpen(true); }}
-                    className="text-center hover:opacity-70 transition-opacity"
-                  >
+                  <button onClick={() => { setFollowDialogType("following"); setFollowDialogOpen(true); }} className="text-center hover:opacity-70 transition-opacity">
                     <p className="text-lg font-bold text-foreground">{followingCount}</p>
                     <p className="text-xs text-muted-foreground">following</p>
                   </button>
@@ -223,7 +226,6 @@ const Profile = () => {
         </div>
       </motion.div>
 
-      {/* Posts & Reposts Tabs */}
       <Tabs defaultValue="posts" className="w-full">
         <TabsList className="w-full glass rounded-2xl mb-4">
           <TabsTrigger value="posts" className="flex-1 gap-2 rounded-xl">
@@ -242,14 +244,7 @@ const Profile = () => {
           ) : (
             <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
               {posts.map((post, i) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => setSelectedPost(post)}
-                  className="aspect-square bg-secondary group relative cursor-pointer"
-                >
+                <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} onClick={() => setSelectedPost(post)} className="aspect-square bg-secondary group relative cursor-pointer">
                   {post.media_type === "video" ? (
                     <video src={post.media_url} className="h-full w-full object-cover" />
                   ) : (
@@ -270,14 +265,7 @@ const Profile = () => {
           ) : (
             <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
               {reposts.map((post, i) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => setSelectedPost(post)}
-                  className="aspect-square bg-secondary group relative cursor-pointer"
-                >
+                <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} onClick={() => setSelectedPost(post)} className="aspect-square bg-secondary group relative cursor-pointer">
                   {post.media_type === "video" ? (
                     <video src={post.media_url} className="h-full w-full object-cover" />
                   ) : (
@@ -291,7 +279,6 @@ const Profile = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Post preview dialog */}
       <Dialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
         <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-3xl border-border/30 bg-background">
           {selectedPost && (
