@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/config";
+import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -21,34 +22,39 @@ const RightSidebar = () => {
   useEffect(() => {
     if (!user) return;
     const fetchSuggestions = async () => {
-      const { data: following } = await supabase
-        .from("follows")
-        .select("following_id")
-        .eq("follower_id", user.id);
-      const followingIds = new Set((following || []).map((f) => f.following_id));
-      followingIds.add(user.id);
+      // Get who user follows
+      const followsSnap = await getDocs(
+        query(collection(db, "follows"), where("follower_id", "==", user.uid))
+      );
+      const followingIds = new Set(followsSnap.docs.map((d) => d.data().following_id));
+      followingIds.add(user.uid);
 
-      const { data: users } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url, bio")
-        .limit(20);
+      // Get all profiles
+      const profilesSnap = await getDocs(collection(db, "profiles"));
+      const allUsers: SuggestedUser[] = profilesSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as any))
+        .filter((u: any) => !followingIds.has(u.id))
+        .slice(0, 5);
 
-      const filtered = (users || []).filter((u) => !followingIds.has(u.id)).slice(0, 5);
-      setSuggestions(filtered);
+      setSuggestions(allUsers);
     };
     fetchSuggestions();
   }, [user]);
 
   const handleFollow = async (targetId: string) => {
     if (!user) return;
-    await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId });
+    const followId = `${user.uid}_${targetId}`;
+    await setDoc(doc(db, "follows", followId), {
+      follower_id: user.uid,
+      following_id: targetId,
+      created_at: serverTimestamp(),
+    });
     setFollowedIds((prev) => new Set(prev).add(targetId));
   };
 
   return (
     <aside className="hidden xl:block w-72 shrink-0">
       <div className="sticky top-6 space-y-6">
-        {/* Follow Suggestions */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -93,7 +99,6 @@ const RightSidebar = () => {
           </div>
         </motion.div>
 
-        {/* Trending Section */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Heart, MessageCircle, Send, Bookmark, Repeat2, Download } from "lucide-react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/config";
+import { doc, setDoc, deleteDoc, collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -53,10 +54,11 @@ const PostCard = ({
     const wasLiked = liked;
     setLiked(!wasLiked);
     setLikes((prev) => (wasLiked ? prev - 1 : prev + 1));
+    const likeRef = doc(db, "posts", id, "likes", user.uid);
     if (wasLiked) {
-      await supabase.from("likes").delete().eq("post_id", id).eq("user_id", user.id);
+      await deleteDoc(likeRef);
     } else {
-      await supabase.from("likes").insert({ post_id: id, user_id: user.id });
+      await setDoc(likeRef, { user_id: user.uid, created_at: serverTimestamp() });
     }
     onLikeToggle();
   };
@@ -65,11 +67,12 @@ const PostCard = ({
     if (!user) return;
     const wasSaved = saved;
     setSaved(!wasSaved);
+    const saveRef = doc(db, "users", user.uid, "saved_posts", id);
     if (wasSaved) {
-      await supabase.from("saved_posts").delete().eq("post_id", id).eq("user_id", user.id);
+      await deleteDoc(saveRef);
       toast({ title: "Removed from saved" });
     } else {
-      await supabase.from("saved_posts").insert({ post_id: id, user_id: user.id });
+      await setDoc(saveRef, { post_id: id, created_at: serverTimestamp() });
       toast({ title: "Post saved!" });
     }
   };
@@ -79,11 +82,16 @@ const PostCard = ({
     const wasReposted = reposted;
     setReposted(!wasReposted);
     setReposts((prev) => (wasReposted ? prev - 1 : prev + 1));
+    const repostRef = doc(db, "posts", id, "reposts", user.uid);
     if (wasReposted) {
-      await supabase.from("reposts").delete().eq("post_id", id).eq("user_id", user.id);
+      await deleteDoc(repostRef);
+      // Also remove from user's reposts subcollection
+      await deleteDoc(doc(db, "users", user.uid, "reposts", id));
       toast({ title: "Repost removed" });
     } else {
-      await supabase.from("reposts").insert({ post_id: id, user_id: user.id });
+      await setDoc(repostRef, { user_id: user.uid, created_at: serverTimestamp() });
+      // Also add to user's reposts subcollection for profile page
+      await setDoc(doc(db, "users", user.uid, "reposts", id), { post_id: id, created_at: serverTimestamp() });
       toast({ title: "Reposted!" });
     }
   };
@@ -111,10 +119,10 @@ const PostCard = ({
     e.preventDefault();
     if (!user || !commentText.trim()) return;
     setSubmitting(true);
-    await supabase.from("comments").insert({
-      post_id: id,
-      user_id: user.id,
+    await addDoc(collection(db, "posts", id, "comments"), {
+      user_id: user.uid,
       text: commentText.trim(),
+      created_at: serverTimestamp(),
     });
     setCommentText("");
     setSubmitting(false);
@@ -167,19 +175,16 @@ const PostCard = ({
       <div className="px-5 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {/* Like */}
             <motion.button whileTap={{ scale: 0.85 }} onClick={handleLike} className="flex items-center gap-1.5 transition-colors">
               <Heart className={`h-5 w-5 transition-all ${liked ? "fill-like text-like animate-heart-pop" : "text-muted-foreground hover:text-foreground"}`} />
               <span className={`text-sm font-medium ${liked ? "text-like" : "text-muted-foreground"}`}>{likes}</span>
             </motion.button>
 
-            {/* Comment */}
             <label htmlFor={`comment-${id}`} className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
               <MessageCircle className="h-5 w-5" />
               <span className="text-sm font-medium">{comments.length}</span>
             </label>
 
-            {/* Repost */}
             <motion.button whileTap={{ scale: 0.85 }} onClick={handleRepost} className="flex items-center gap-1.5 transition-colors">
               <Repeat2 className={`h-5 w-5 transition-all ${reposted ? "text-green-500" : "text-muted-foreground hover:text-foreground"}`} />
               {reposts > 0 && (
@@ -187,13 +192,11 @@ const PostCard = ({
               )}
             </motion.button>
 
-            {/* Download */}
             <motion.button whileTap={{ scale: 0.85 }} onClick={handleDownload} className="text-muted-foreground hover:text-foreground transition-colors">
               <Download className="h-5 w-5" />
             </motion.button>
           </div>
 
-          {/* Save */}
           <motion.button whileTap={{ scale: 0.85 }} onClick={handleSave} className="transition-colors">
             <Bookmark className={`h-5 w-5 transition-all ${saved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`} />
           </motion.button>

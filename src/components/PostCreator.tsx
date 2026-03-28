@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { db, storage } from "@/integrations/firebase/config";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,20 +35,19 @@ const PostCreator = ({ avatarUrl, username, onPostCreated }: PostCreatorProps) =
     setLoading(true);
     try {
       const ext = file.name.split(".").pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("media").upload(path, file);
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+      const path = `media/${user.uid}/${Date.now()}.${ext}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const publicUrl = await getDownloadURL(storageRef);
       const mediaType = file.type.startsWith("video/") ? "video" : "image";
 
-      const { error } = await supabase.from("posts").insert({
-        user_id: user.id,
+      await addDoc(collection(db, "posts"), {
+        user_id: user.uid,
         media_url: publicUrl,
         media_type: mediaType,
         caption: caption.trim(),
+        created_at: serverTimestamp(),
       });
-      if (error) throw error;
 
       setCaption("");
       setFile(null);
