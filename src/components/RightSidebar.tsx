@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { db } from "@/integrations/firebase/config";
-import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -22,44 +21,37 @@ const RightSidebar = () => {
   useEffect(() => {
     if (!user) return;
     const fetchSuggestions = async () => {
-      // Get who user follows
-      const followsSnap = await getDocs(
-        query(collection(db, "follows"), where("follower_id", "==", user.uid))
-      );
-      const followingIds = new Set(followsSnap.docs.map((d) => d.data().following_id));
-      followingIds.add(user.uid);
+      const { data: follows } = await supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", user.id);
+      const followingIds = new Set((follows || []).map((f) => f.following_id));
+      followingIds.add(user.id);
 
-      // Get all profiles
-      const profilesSnap = await getDocs(collection(db, "profiles"));
-      const allUsers: SuggestedUser[] = profilesSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as any))
-        .filter((u: any) => !followingIds.has(u.id))
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, bio")
+        .limit(20);
+
+      const filtered = (profiles || [])
+        .filter((p) => !followingIds.has(p.id))
         .slice(0, 5);
 
-      setSuggestions(allUsers);
+      setSuggestions(filtered);
     };
     fetchSuggestions();
   }, [user]);
 
   const handleFollow = async (targetId: string) => {
     if (!user) return;
-    const followId = `${user.uid}_${targetId}`;
-    await setDoc(doc(db, "follows", followId), {
-      follower_id: user.uid,
-      following_id: targetId,
-      created_at: serverTimestamp(),
-    });
+    await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId });
     setFollowedIds((prev) => new Set(prev).add(targetId));
   };
 
   return (
     <aside className="hidden xl:block w-72 shrink-0">
       <div className="sticky top-6 space-y-6">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-3xl p-5 shadow-card"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-3xl p-5 shadow-card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground">Suggested for you</h3>
           </div>
@@ -83,28 +75,17 @@ const RightSidebar = () => {
                 {followedIds.has(u.id) ? (
                   <span className="text-xs text-muted-foreground">Following</span>
                 ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => handleFollow(u.id)}
-                    className="h-7 px-3 text-xs rounded-full gradient-warm text-primary-foreground border-0 hover:opacity-90"
-                  >
+                  <Button size="sm" onClick={() => handleFollow(u.id)} className="h-7 px-3 text-xs rounded-full gradient-warm text-primary-foreground border-0 hover:opacity-90">
                     Follow
                   </Button>
                 )}
               </div>
             ))}
-            {suggestions.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-2">No suggestions</p>
-            )}
+            {suggestions.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No suggestions</p>}
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="glass rounded-3xl p-5 shadow-card"
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass rounded-3xl p-5 shadow-card">
           <h3 className="text-sm font-semibold text-foreground mb-4">🔥 Trending Today</h3>
           <div className="space-y-3">
             {["Photography", "Travel", "Design", "Nature"].map((topic) => (

@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Heart, MessageCircle, Send, Bookmark, Repeat2, Download } from "lucide-react";
 import { Link } from "react-router-dom";
-import { db } from "@/integrations/firebase/config";
-import { doc, setDoc, deleteDoc, collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -54,11 +53,10 @@ const PostCard = ({
     const wasLiked = liked;
     setLiked(!wasLiked);
     setLikes((prev) => (wasLiked ? prev - 1 : prev + 1));
-    const likeRef = doc(db, "posts", id, "likes", user.uid);
     if (wasLiked) {
-      await deleteDoc(likeRef);
+      await supabase.from("likes").delete().eq("post_id", id).eq("user_id", user.id);
     } else {
-      await setDoc(likeRef, { user_id: user.uid, created_at: serverTimestamp() });
+      await supabase.from("likes").insert({ post_id: id, user_id: user.id });
     }
     onLikeToggle();
   };
@@ -67,12 +65,11 @@ const PostCard = ({
     if (!user) return;
     const wasSaved = saved;
     setSaved(!wasSaved);
-    const saveRef = doc(db, "users", user.uid, "saved_posts", id);
     if (wasSaved) {
-      await deleteDoc(saveRef);
+      await supabase.from("saved_posts").delete().eq("post_id", id).eq("user_id", user.id);
       toast({ title: "Removed from saved" });
     } else {
-      await setDoc(saveRef, { post_id: id, created_at: serverTimestamp() });
+      await supabase.from("saved_posts").insert({ post_id: id, user_id: user.id });
       toast({ title: "Post saved!" });
     }
   };
@@ -82,16 +79,11 @@ const PostCard = ({
     const wasReposted = reposted;
     setReposted(!wasReposted);
     setReposts((prev) => (wasReposted ? prev - 1 : prev + 1));
-    const repostRef = doc(db, "posts", id, "reposts", user.uid);
     if (wasReposted) {
-      await deleteDoc(repostRef);
-      // Also remove from user's reposts subcollection
-      await deleteDoc(doc(db, "users", user.uid, "reposts", id));
+      await supabase.from("reposts").delete().eq("post_id", id).eq("user_id", user.id);
       toast({ title: "Repost removed" });
     } else {
-      await setDoc(repostRef, { user_id: user.uid, created_at: serverTimestamp() });
-      // Also add to user's reposts subcollection for profile page
-      await setDoc(doc(db, "users", user.uid, "reposts", id), { post_id: id, created_at: serverTimestamp() });
+      await supabase.from("reposts").insert({ post_id: id, user_id: user.id });
       toast({ title: "Reposted!" });
     }
   };
@@ -119,10 +111,10 @@ const PostCard = ({
     e.preventDefault();
     if (!user || !commentText.trim()) return;
     setSubmitting(true);
-    await addDoc(collection(db, "posts", id, "comments"), {
-      user_id: user.uid,
+    await supabase.from("comments").insert({
+      user_id: user.id,
+      post_id: id,
       text: commentText.trim(),
-      created_at: serverTimestamp(),
     });
     setCommentText("");
     setSubmitting(false);
@@ -135,7 +127,6 @@ const PostCard = ({
       animate={{ opacity: 1, y: 0 }}
       className="glass rounded-3xl overflow-hidden shadow-card mb-5"
     >
-      {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4">
         <Link to={`/profile/${author.id}`}>
           <Avatar className="h-10 w-10 ring-2 ring-primary/20">
@@ -155,14 +146,12 @@ const PostCard = ({
         </div>
       </div>
 
-      {/* Caption above media */}
       {caption && (
         <div className="px-5 pb-3">
           <p className="text-sm text-foreground/90 leading-relaxed">{caption}</p>
         </div>
       )}
 
-      {/* Media */}
       <div className="mx-4 mb-4 rounded-2xl overflow-hidden bg-secondary">
         {mediaType === "video" ? (
           <video src={mediaUrl} controls className="w-full object-cover max-h-[500px]" />
@@ -171,7 +160,6 @@ const PostCard = ({
         )}
       </div>
 
-      {/* Actions */}
       <div className="px-5 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -179,31 +167,24 @@ const PostCard = ({
               <Heart className={`h-5 w-5 transition-all ${liked ? "fill-like text-like animate-heart-pop" : "text-muted-foreground hover:text-foreground"}`} />
               <span className={`text-sm font-medium ${liked ? "text-like" : "text-muted-foreground"}`}>{likes}</span>
             </motion.button>
-
             <label htmlFor={`comment-${id}`} className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
               <MessageCircle className="h-5 w-5" />
               <span className="text-sm font-medium">{comments.length}</span>
             </label>
-
             <motion.button whileTap={{ scale: 0.85 }} onClick={handleRepost} className="flex items-center gap-1.5 transition-colors">
               <Repeat2 className={`h-5 w-5 transition-all ${reposted ? "text-green-500" : "text-muted-foreground hover:text-foreground"}`} />
-              {reposts > 0 && (
-                <span className={`text-sm font-medium ${reposted ? "text-green-500" : "text-muted-foreground"}`}>{reposts}</span>
-              )}
+              {reposts > 0 && <span className={`text-sm font-medium ${reposted ? "text-green-500" : "text-muted-foreground"}`}>{reposts}</span>}
             </motion.button>
-
             <motion.button whileTap={{ scale: 0.85 }} onClick={handleDownload} className="text-muted-foreground hover:text-foreground transition-colors">
               <Download className="h-5 w-5" />
             </motion.button>
           </div>
-
           <motion.button whileTap={{ scale: 0.85 }} onClick={handleSave} className="transition-colors">
             <Bookmark className={`h-5 w-5 transition-all ${saved ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground"}`} />
           </motion.button>
         </div>
       </div>
 
-      {/* Comments */}
       {comments.length > 0 && (
         <div className="px-5 pb-2 space-y-1.5">
           {comments.slice(0, 2).map((c) => (
@@ -220,7 +201,6 @@ const PostCard = ({
         </div>
       )}
 
-      {/* Comment input */}
       <form onSubmit={handleComment} className="flex items-center gap-2 px-5 py-3 border-t border-border/30">
         <Input
           id={`comment-${id}`}
@@ -229,12 +209,7 @@ const PostCard = ({
           placeholder="Add a comment..."
           className="flex-1 border-0 bg-transparent text-sm focus-visible:ring-0 px-0 placeholder:text-muted-foreground/50"
         />
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          type="submit"
-          disabled={!commentText.trim() || submitting}
-          className="text-primary disabled:opacity-30 transition-opacity"
-        >
+        <motion.button whileTap={{ scale: 0.9 }} type="submit" disabled={!commentText.trim() || submitting} className="text-primary disabled:opacity-30 transition-opacity">
           <Send className="h-4 w-4" />
         </motion.button>
       </form>

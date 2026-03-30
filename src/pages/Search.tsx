@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { db } from "@/integrations/firebase/config";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,8 +19,6 @@ interface PostResult {
   media_url: string;
   media_type: string;
   caption: string | null;
-  user_id: string;
-  profileUsername?: string;
 }
 
 const Search = () => {
@@ -46,34 +43,21 @@ const Search = () => {
 
     const searchTerm = value.trim().toLowerCase();
 
-    // Search profiles - Firestore doesn't support ILIKE, so we do range query
-    const profilesSnap = await getDocs(
-      query(
-        collection(db, "profiles"),
-        where("username", ">=", searchTerm),
-        where("username", "<=", searchTerm + "\uf8ff"),
-        limit(10)
-      )
-    );
-    const profileResults: ProfileResult[] = profilesSnap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    } as any));
+    const { data: profileResults } = await supabase
+      .from("profiles")
+      .select("id, username, avatar_url, bio")
+      .ilike("username", `%${searchTerm}%`)
+      .limit(10);
 
-    // For posts, we fetch recent posts and filter client-side (Firestore lacks full-text search)
-    const postsSnap = await getDocs(
-      query(collection(db, "posts"), orderBy("created_at", "desc"), limit(50))
-    );
-    const postResults: PostResult[] = postsSnap.docs
-      .filter((d) => {
-        const caption = (d.data().caption || "").toLowerCase();
-        return caption.includes(searchTerm);
-      })
-      .slice(0, 12)
-      .map((d) => ({ id: d.id, ...d.data() } as any));
+    const { data: postResults } = await supabase
+      .from("posts")
+      .select("id, media_url, media_type, caption")
+      .ilike("caption", `%${searchTerm}%`)
+      .order("created_at", { ascending: false })
+      .limit(12);
 
-    setUsers(profileResults);
-    setPosts(postResults);
+    setUsers(profileResults || []);
+    setPosts(postResults || []);
     setLoading(false);
   };
 
@@ -105,7 +89,7 @@ const Search = () => {
                 {users.map((u) => (
                   <Link
                     key={u.id}
-                    to={u.id === user?.uid ? "/profile" : `/profile/${u.id}`}
+                    to={u.id === user?.id ? "/profile" : `/profile/${u.id}`}
                     className="flex items-center gap-3 rounded-2xl p-3 hover:bg-secondary/50 transition-colors"
                   >
                     <Avatar className="h-10 w-10">

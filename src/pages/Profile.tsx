@@ -1,9 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import FollowListDialog from "@/components/FollowListDialog";
 import { useParams } from "react-router-dom";
-import { db, storage } from "@/integrations/firebase/config";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -35,8 +33,8 @@ const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const targetId = userId || user?.uid;
-  const isOwnProfile = !userId || userId === user?.uid;
+  const targetId = userId || user?.id;
+  const isOwnProfile = !userId || userId === user?.id;
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -56,50 +54,65 @@ const Profile = () => {
   const fetchProfile = async () => {
     if (!targetId) return;
 
-    // Profile
-    const profileSnap = await getDoc(doc(db, "profiles", targetId));
-    if (profileSnap.exists()) {
-      const data = profileSnap.data();
-      const p = { id: targetId, username: data.username, bio: data.bio || "", avatar_url: data.avatar_url || "" };
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", targetId)
+      .single();
+
+    if (profileData) {
+      const p = { id: targetId, username: profileData.username, bio: profileData.bio || "", avatar_url: profileData.avatar_url || "" };
       setProfile(p);
       setBio(p.bio);
       setUsername(p.username);
     }
 
-    // Posts
-    const postsQuery = query(collection(db, "posts"), where("user_id", "==", targetId), orderBy("created_at", "desc"));
-    const postsSnap = await getDocs(postsQuery);
-    setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+    const { data: postsData } = await supabase
+      .from("posts")
+      .select("id, media_url, media_type, caption")
+      .eq("user_id", targetId)
+      .order("created_at", { ascending: false });
+    setPosts(postsData || []);
 
-    // Reposts - from user's reposts subcollection
-    const repostsSnap = await getDocs(collection(db, "users", targetId, "reposts"));
-    const repostPosts: Post[] = [];
-    for (const rDoc of repostsSnap.docs) {
-      const postId = rDoc.data().post_id;
-      const postSnap = await getDoc(doc(db, "posts", postId));
-      if (postSnap.exists()) {
-        repostPosts.push({ id: postSnap.id, ...postSnap.data() } as any);
-      }
+    // Reposts
+    const { data: repostsData } = await supabase
+      .from("reposts")
+      .select("post_id")
+      .eq("user_id", targetId);
+    if (repostsData && repostsData.length > 0) {
+      const postIds = repostsData.map((r) => r.post_id);
+      const { data: repostPosts } = await supabase
+        .from("posts")
+        .select("id, media_url, media_type, caption")
+        .in("id", postIds);
+      setReposts(repostPosts || []);
+    } else {
+      setReposts([]);
     }
-    setReposts(repostPosts);
 
-    // Followers count
-    const followersSnap = await getDocs(query(collection(db, "follows"), where("following_id", "==", targetId)));
-    setFollowersCount(followersSnap.size);
+    // Followers
+    const { count: fCount } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", targetId);
+    setFollowersCount(fCount || 0);
 
-    // Following count
-    const followingSnap = await getDocs(query(collection(db, "follows"), where("follower_id", "==", targetId)));
-    setFollowingCount(followingSnap.size);
+    // Following
+    const { count: gCount } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", targetId);
+    setFollowingCount(gCount || 0);
 
     // Is following
-    if (user && targetId !== user.uid) {
-      const followQuery = query(
-        collection(db, "follows"),
-        where("follower_id", "==", user.uid),
-        where("following_id", "==", targetId)
-      );
-      const followSnap = await getDocs(followQuery);
-      setIsFollowing(!followSnap.empty);
+    if (user && targetId !== user.id) {
+      const { data: followData } = await supabase
+        .from("follows")
+        .select("id")
+        .eq("follower_id", user.id)
+        .eq("following_id", targetId)
+        .maybeSingle();
+      setIsFollowing(!!followData);
     }
 
     setLoading(false);
@@ -110,12 +123,10 @@ const Profile = () => {
   const handleFollow = async () => {
     if (!user || !targetId) return;
     setFollowLoading(true);
-    const followId = `${user.uid}_${targetId}`;
-    const followRef = doc(db, "follows", followId);
     if (isFollowing) {
-      await deleteDoc(followRef);
+      await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", targetId);
     } else {
-      await setDoc(followRef, { follower_id: user.uid, following_id: targetId, created_at: serverTimestamp() });
+      await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId });
     }
     setIsFollowing(!isFollowing);
     setFollowersCount((c) => (isFollowing ? c - 1 : c + 1));
@@ -126,18 +137,19 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     const ext = file.name.split(".").pop();
-    const path = `avatars/${user.uid}/avatar.${ext}`;
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    const publicUrl = await getDownloadURL(storageRef);
-    await updateDoc(doc(db, "profiles", user.uid), { avatar_url: publicUrl, updated_at: serverTimestamp() });
+    const path = `${user.id}/avatar.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("media").upload(path, file, { upsert: true });
+    if (uploadError) { toast({ title: "Upload error", description: uploadError.message, variant: "destructive" }); return; }
+    const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
+    await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
     fetchProfile();
   };
 
   const handleSave = async () => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, "profiles", user.uid), { bio, username, updated_at: serverTimestamp() });
+      const { error } = await supabase.from("profiles").update({ bio, username }).eq("id", user.id);
+      if (error) throw error;
       setEditing(false);
       fetchProfile();
     } catch (error: any) {
@@ -168,10 +180,7 @@ const Profile = () => {
             </Avatar>
             {isOwnProfile && (
               <>
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="absolute bottom-0 right-0 rounded-full gradient-warm p-1.5 text-primary-foreground shadow glow-sm"
-                >
+                <button onClick={() => fileRef.current?.click()} className="absolute bottom-0 right-0 rounded-full gradient-warm p-1.5 text-primary-foreground shadow glow-sm">
                   <Camera className="h-3 w-3" />
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
@@ -207,16 +216,9 @@ const Profile = () => {
                 </div>
                 <p className="text-sm text-muted-foreground mt-3">{profile?.bio || "No bio yet"}</p>
                 {isOwnProfile ? (
-                  <Button size="sm" variant="outline" className="mt-3 rounded-xl border-border/50" onClick={() => setEditing(true)}>
-                    Edit Profile
-                  </Button>
+                  <Button size="sm" variant="outline" className="mt-3 rounded-xl border-border/50" onClick={() => setEditing(true)}>Edit Profile</Button>
                 ) : user ? (
-                  <Button
-                    size="sm"
-                    className={`mt-3 rounded-xl border-0 ${isFollowing ? "bg-secondary text-foreground" : "gradient-warm text-primary-foreground"}`}
-                    onClick={handleFollow}
-                    disabled={followLoading}
-                  >
+                  <Button size="sm" className={`mt-3 rounded-xl border-0 ${isFollowing ? "bg-secondary text-foreground" : "gradient-warm text-primary-foreground"}`} onClick={handleFollow} disabled={followLoading}>
                     {isFollowing ? "Unfollow" : "Follow"}
                   </Button>
                 ) : null}
@@ -228,49 +230,31 @@ const Profile = () => {
 
       <Tabs defaultValue="posts" className="w-full">
         <TabsList className="w-full glass rounded-2xl mb-4">
-          <TabsTrigger value="posts" className="flex-1 gap-2 rounded-xl">
-            <Grid3X3 className="h-4 w-4" /> Posts
-          </TabsTrigger>
-          <TabsTrigger value="reposts" className="flex-1 gap-2 rounded-xl">
-            <Repeat2 className="h-4 w-4" /> Reposts
-          </TabsTrigger>
+          <TabsTrigger value="posts" className="flex-1 gap-2 rounded-xl"><Grid3X3 className="h-4 w-4" /> Posts</TabsTrigger>
+          <TabsTrigger value="reposts" className="flex-1 gap-2 rounded-xl"><Repeat2 className="h-4 w-4" /> Reposts</TabsTrigger>
         </TabsList>
-
         <TabsContent value="posts">
           {posts.length === 0 ? (
-            <div className="glass rounded-3xl py-16 text-center shadow-card">
-              <p className="text-muted-foreground text-sm">No posts yet</p>
-            </div>
+            <div className="glass rounded-3xl py-16 text-center shadow-card"><p className="text-muted-foreground text-sm">No posts yet</p></div>
           ) : (
             <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
               {posts.map((post, i) => (
                 <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} onClick={() => setSelectedPost(post)} className="aspect-square bg-secondary group relative cursor-pointer">
-                  {post.media_type === "video" ? (
-                    <video src={post.media_url} className="h-full w-full object-cover" />
-                  ) : (
-                    <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />
-                  )}
+                  {post.media_type === "video" ? <video src={post.media_url} className="h-full w-full object-cover" /> : <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />}
                   <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
                 </motion.div>
               ))}
             </div>
           )}
         </TabsContent>
-
         <TabsContent value="reposts">
           {reposts.length === 0 ? (
-            <div className="glass rounded-3xl py-16 text-center shadow-card">
-              <p className="text-muted-foreground text-sm">No reposts yet</p>
-            </div>
+            <div className="glass rounded-3xl py-16 text-center shadow-card"><p className="text-muted-foreground text-sm">No reposts yet</p></div>
           ) : (
             <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
               {reposts.map((post, i) => (
                 <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} onClick={() => setSelectedPost(post)} className="aspect-square bg-secondary group relative cursor-pointer">
-                  {post.media_type === "video" ? (
-                    <video src={post.media_url} className="h-full w-full object-cover" />
-                  ) : (
-                    <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />
-                  )}
+                  {post.media_type === "video" ? <video src={post.media_url} className="h-full w-full object-cover" /> : <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />}
                   <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
                 </motion.div>
               ))}
@@ -284,30 +268,15 @@ const Profile = () => {
           {selectedPost && (
             <div>
               <div className="bg-secondary">
-                {selectedPost.media_type === "video" ? (
-                  <video src={selectedPost.media_url} controls autoPlay className="w-full max-h-[70vh] object-contain" />
-                ) : (
-                  <img src={selectedPost.media_url} alt={selectedPost.caption} className="w-full max-h-[70vh] object-contain" />
-                )}
+                {selectedPost.media_type === "video" ? <video src={selectedPost.media_url} controls autoPlay className="w-full max-h-[70vh] object-contain" /> : <img src={selectedPost.media_url} alt={selectedPost.caption} className="w-full max-h-[70vh] object-contain" />}
               </div>
-              {selectedPost.caption && (
-                <div className="p-5">
-                  <p className="text-sm text-foreground/90 leading-relaxed">{selectedPost.caption}</p>
-                </div>
-              )}
+              {selectedPost.caption && <div className="p-5"><p className="text-sm text-foreground/90 leading-relaxed">{selectedPost.caption}</p></div>}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {targetId && (
-        <FollowListDialog
-          open={followDialogOpen}
-          onOpenChange={setFollowDialogOpen}
-          userId={targetId}
-          type={followDialogType}
-        />
-      )}
+      {targetId && <FollowListDialog open={followDialogOpen} onOpenChange={setFollowDialogOpen} userId={targetId} type={followDialogType} />}
     </AppLayout>
   );
 };
