@@ -1,8 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { db, storage } from "@/integrations/firebase/config";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -35,19 +33,20 @@ const CreatePost = () => {
 
     try {
       const ext = file.name.split(".").pop();
-      const path = `media/${user.uid}/${Date.now()}.${ext}`;
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const publicUrl = await getDownloadURL(storageRef);
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("media").upload(path, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(path);
       const mediaType = file.type.startsWith("video/") ? "video" : "image";
 
-      await addDoc(collection(db, "posts"), {
-        user_id: user.uid,
+      const { error } = await supabase.from("posts").insert({
+        user_id: user.id,
         media_url: publicUrl,
         media_type: mediaType,
         caption: caption.trim(),
-        created_at: serverTimestamp(),
       });
+      if (error) throw error;
 
       toast({ title: "Posted!", description: "Your post is now live." });
       navigate("/");

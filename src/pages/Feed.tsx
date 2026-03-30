@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { db } from "@/integrations/firebase/config";
-import { collection, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import PostCard from "@/components/PostCard";
 import PostCreator from "@/components/PostCreator";
@@ -33,89 +32,54 @@ const Feed = () => {
 
   const fetchPosts = async () => {
     try {
-      const postsQuery = query(collection(db, "posts"), orderBy("created_at", "desc"));
-      const postsSnap = await getDocs(postsQuery);
+      const { data: postsData, error } = await supabase
+        .from("posts")
+        .select(`
+          *,
+          profiles:user_id(id, username, avatar_url),
+          likes(user_id),
+          comments(id, text, created_at, profiles:user_id(username, avatar_url)),
+          reposts(user_id)
+        `)
+        .order("created_at", { ascending: false });
 
-      const postsData: Post[] = await Promise.all(
-        postsSnap.docs.map(async (postDoc) => {
-          const data = postDoc.data();
-          const postId = postDoc.id;
+      if (error) throw error;
 
-          // Fetch profile
-          let profileData = null;
-          if (data.user_id) {
-            const profileSnap = await getDoc(doc(db, "profiles", data.user_id));
-            if (profileSnap.exists()) {
-              profileData = { id: data.user_id, ...profileSnap.data() } as any;
-            }
-          }
+      const formatted = (postsData || []).map((p: any) => ({
+        ...p,
+        profiles: p.profiles ? { id: p.profiles.id, username: p.profiles.username, avatar_url: p.profiles.avatar_url } : null,
+        comments: (p.comments || []).map((c: any) => ({
+          ...c,
+          profiles: c.profiles ? { username: c.profiles.username, avatar_url: c.profiles.avatar_url } : null,
+        })),
+      }));
 
-          // Fetch likes
-          const likesSnap = await getDocs(collection(db, "posts", postId, "likes"));
-          const likes = likesSnap.docs.map((d) => ({ user_id: d.data().user_id }));
+      setPosts(formatted);
 
-          // Fetch comments
-          const commentsQuery = query(collection(db, "posts", postId, "comments"), orderBy("created_at", "asc"));
-          const commentsSnap = await getDocs(commentsQuery);
-          const comments = await Promise.all(
-            commentsSnap.docs.map(async (c) => {
-              const cData = c.data();
-              let commentProfile = null;
-              if (cData.user_id) {
-                const pSnap = await getDoc(doc(db, "profiles", cData.user_id));
-                if (pSnap.exists()) commentProfile = pSnap.data() as any;
-              }
-              return {
-                id: c.id,
-                text: cData.text,
-                created_at: cData.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-                profiles: commentProfile ? { username: commentProfile.username, avatar_url: commentProfile.avatar_url } : null,
-              };
-            })
-          );
-
-          // Fetch reposts
-          const repostsSnap = await getDocs(collection(db, "posts", postId, "reposts"));
-          const reposts = repostsSnap.docs.map((d) => ({ user_id: d.data().user_id }));
-
-          return {
-            id: postId,
-            media_url: data.media_url,
-            media_type: data.media_type || "image",
-            caption: data.caption || "",
-            created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-            user_id: data.user_id,
-            profiles: profileData ? { username: profileData.username, avatar_url: profileData.avatar_url, id: profileData.id } : null,
-            likes,
-            comments,
-            reposts,
-          };
-        })
-      );
-
-      setPosts(postsData);
-
-      // Fetch saved posts
       if (user) {
-        const savedSnap = await getDocs(collection(db, "users", user.uid, "saved_posts"));
-        setSavedPostIds(new Set(savedSnap.docs.map((d) => d.data().post_id)));
+        const { data: saved } = await supabase
+          .from("saved_posts")
+          .select("post_id")
+          .eq("user_id", user.id);
+        setSavedPostIds(new Set((saved || []).map((s) => s.post_id)));
       }
     } catch (error) {
       console.error("Error fetching posts:", error);
     }
-
     setLoading(false);
   };
 
   useEffect(() => {
     fetchPosts();
     if (user) {
-      getDoc(doc(db, "profiles", user.uid)).then((snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          setProfile({ username: data.username, avatar_url: data.avatar_url });
-        }
-      });
+      supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setProfile({ username: data.username, avatar_url: data.avatar_url || "" });
+        });
     }
   }, [user]);
 
@@ -150,9 +114,9 @@ const Feed = () => {
               id: post.profiles?.id || post.user_id,
             }}
             likesCount={post.likes?.length || 0}
-            isLiked={post.likes?.some((l) => l.user_id === user?.uid) || false}
+            isLiked={post.likes?.some((l) => l.user_id === user?.id) || false}
             isSaved={savedPostIds.has(post.id)}
-            isReposted={post.reposts?.some((r) => r.user_id === user?.uid) || false}
+            isReposted={post.reposts?.some((r) => r.user_id === user?.id) || false}
             repostsCount={post.reposts?.length || 0}
             comments={post.comments || []}
             onLikeToggle={fetchPosts}
