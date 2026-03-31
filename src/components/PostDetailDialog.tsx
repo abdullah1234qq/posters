@@ -1,6 +1,7 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Send, Bookmark, Repeat2, Download } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, Repeat2, Download, Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
