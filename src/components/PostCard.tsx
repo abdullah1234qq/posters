@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
+import PostDetailDialog from "@/components/PostDetailDialog";
 
 interface Comment {
   id: string;
