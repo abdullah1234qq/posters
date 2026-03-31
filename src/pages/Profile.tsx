@@ -91,6 +91,22 @@ const Profile = () => {
       setReposts([]);
     }
 
+    // Liked posts
+    const { data: likesData } = await supabase
+      .from("likes")
+      .select("post_id")
+      .eq("user_id", targetId);
+    if (likesData && likesData.length > 0) {
+      const likedIds = likesData.map((l) => l.post_id);
+      const { data: likedPostsData } = await supabase
+        .from("posts")
+        .select("id, media_url, media_type, caption")
+        .in("id", likedIds);
+      setLikedPosts(likedPostsData || []);
+    } else {
+      setLikedPosts([]);
+    }
+
     // Followers
     const { count: fCount } = await supabase
       .from("follows")
