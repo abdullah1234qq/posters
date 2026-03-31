@@ -93,21 +93,31 @@ const PostDetailDialog = ({
                   </p>
                 )}
                 {comments.map((c) => (
-                  <div key={c.id} className="flex gap-2">
+                  <div key={c.id} className="flex gap-2 group">
                     <Avatar className="h-7 w-7 mt-0.5 shrink-0">
                       <AvatarImage src={c.profiles?.avatar_url} />
                       <AvatarFallback className="bg-secondary text-muted-foreground text-[10px]">
                         {c.profiles?.username?.[0]?.toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm text-foreground/80">
                         <span className="font-semibold text-foreground">{c.profiles?.username}</span>{" "}
                         {c.text}
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
-                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                        </p>
+                        {user?.id === c.user_id && (
+                          <button
+                            onClick={() => onDeleteComment(c.id)}
+                            className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
