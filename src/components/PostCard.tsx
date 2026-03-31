@@ -124,6 +124,12 @@ const PostCard = ({
     onCommentAdded();
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return;
+    await supabase.from("comments").delete().eq("id", commentId).eq("user_id", user.id);
+    onCommentAdded();
+  };
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 12 }}
