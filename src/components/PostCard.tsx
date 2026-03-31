@@ -215,6 +215,29 @@ const PostCard = ({
           <Send className="h-4 w-4" />
         </motion.button>
       </form>
+      <PostDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        mediaUrl={mediaUrl}
+        mediaType={mediaType}
+        caption={caption}
+        createdAt={createdAt}
+        author={author}
+        likes={likes}
+        liked={liked}
+        saved={saved}
+        reposted={reposted}
+        reposts={reposts}
+        comments={comments}
+        commentText={commentText}
+        submitting={submitting}
+        onCommentTextChange={setCommentText}
+        onComment={handleComment}
+        onLike={handleLike}
+        onSave={handleSave}
+        onRepost={handleRepost}
+        onDownload={handleDownload}
+      />
     </motion.article>
   );
 };
