@@ -197,10 +197,17 @@ const PostCard = ({
       {comments.length > 0 && (
         <div className="px-5 pb-2 space-y-1.5">
           {comments.slice(0, 2).map((c) => (
-            <p key={c.id} className="text-sm text-foreground/80">
-              <span className="font-semibold text-foreground">{c.profiles?.username}</span>{" "}
-              {c.text}
-            </p>
+            <div key={c.id} className="flex items-center justify-between group">
+              <p className="text-sm text-foreground/80">
+                <span className="font-semibold text-foreground">{c.profiles?.username}</span>{" "}
+                {c.text}
+              </p>
+              {user?.id === c.user_id && (
+                <button onClick={() => handleDeleteComment(c.id)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity text-xs ml-2 shrink-0">
+                  Delete
+                </button>
+              )}
+            </div>
           ))}
           {comments.length > 2 && (
             <p className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
