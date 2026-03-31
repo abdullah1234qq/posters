@@ -279,6 +279,20 @@ const Profile = () => {
             </div>
           )}
         </TabsContent>
+        <TabsContent value="likes">
+          {likedPosts.length === 0 ? (
+            <div className="glass rounded-3xl py-16 text-center shadow-card"><p className="text-muted-foreground text-sm">No liked posts yet</p></div>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
+              {likedPosts.map((post, i) => (
+                <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} onClick={() => setSelectedPost(post)} className="aspect-square bg-secondary group relative cursor-pointer">
+                  {post.media_type === "video" ? <video src={post.media_url} className="h-full w-full object-cover" /> : <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />}
+                  <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       <Dialog open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
