@@ -249,6 +249,7 @@ const Profile = () => {
         <TabsList className="w-full glass rounded-2xl mb-4">
           <TabsTrigger value="posts" className="flex-1 gap-2 rounded-xl"><Grid3X3 className="h-4 w-4" /> Posts</TabsTrigger>
           <TabsTrigger value="reposts" className="flex-1 gap-2 rounded-xl"><Repeat2 className="h-4 w-4" /> Reposts</TabsTrigger>
+          <TabsTrigger value="likes" className="flex-1 gap-2 rounded-xl"><Heart className="h-4 w-4" /> Likes</TabsTrigger>
         </TabsList>
         <TabsContent value="posts">
           {posts.length === 0 ? (
