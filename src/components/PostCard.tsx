@@ -48,6 +48,7 @@ const PostCard = ({
   const [saved, setSaved] = useState(isSaved);
   const [reposted, setReposted] = useState(isReposted);
   const [reposts, setReposts] = useState(repostsCount);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const handleLike = async () => {
     if (!user) return;
