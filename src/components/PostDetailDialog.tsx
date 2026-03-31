@@ -38,6 +38,7 @@ interface PostDetailDialogProps {
   onSave: () => void;
   onRepost: () => void;
   onDownload: () => void;
+  onDeleteComment: (commentId: string) => void;
 }
 
 const PostDetailDialog = ({
