@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
+import PostDetailDialog from "@/components/PostDetailDialog";
 
 interface Comment {
   id: string;
@@ -47,6 +48,7 @@ const PostCard = ({
   const [saved, setSaved] = useState(isSaved);
   const [reposted, setReposted] = useState(isReposted);
   const [reposts, setReposts] = useState(repostsCount);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const handleLike = async () => {
     if (!user) return;
@@ -152,9 +154,9 @@ const PostCard = ({
         </div>
       )}
 
-      <div className="mx-4 mb-4 rounded-2xl overflow-hidden bg-secondary">
+      <div className="mx-4 mb-4 rounded-2xl overflow-hidden bg-secondary cursor-pointer" onClick={() => setDetailOpen(true)}>
         {mediaType === "video" ? (
-          <video src={mediaUrl} controls className="w-full object-cover max-h-[500px]" />
+          <video src={mediaUrl} className="w-full object-cover max-h-[500px]" />
         ) : (
           <img src={mediaUrl} alt={caption} className="w-full object-cover max-h-[500px]" loading="lazy" />
         )}
@@ -213,6 +215,29 @@ const PostCard = ({
           <Send className="h-4 w-4" />
         </motion.button>
       </form>
+      <PostDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        mediaUrl={mediaUrl}
+        mediaType={mediaType}
+        caption={caption}
+        createdAt={createdAt}
+        author={author}
+        likes={likes}
+        liked={liked}
+        saved={saved}
+        reposted={reposted}
+        reposts={reposts}
+        comments={comments}
+        commentText={commentText}
+        submitting={submitting}
+        onCommentTextChange={setCommentText}
+        onComment={handleComment}
+        onLike={handleLike}
+        onSave={handleSave}
+        onRepost={handleRepost}
+        onDownload={handleDownload}
+      />
     </motion.article>
   );
 };
