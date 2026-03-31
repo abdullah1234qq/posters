@@ -250,6 +250,7 @@ const PostCard = ({
         onLike={handleLike}
         onSave={handleSave}
         onRepost={handleRepost}
+        onDownload={handleDownload}
         onDeleteComment={handleDeleteComment}
       />
     </motion.article>
