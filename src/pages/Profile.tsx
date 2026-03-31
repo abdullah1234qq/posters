@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Grid3X3, Repeat2 } from "lucide-react";
+import { Camera, Grid3X3, Repeat2, Heart } from "lucide-react";
 import { motion } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,6 +39,7 @@ const Profile = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [reposts, setReposts] = useState<Post[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [editing, setEditing] = useState(false);
   const [bio, setBio] = useState("");
   const [username, setUsername] = useState("");
@@ -88,6 +89,22 @@ const Profile = () => {
       setReposts(repostPosts || []);
     } else {
       setReposts([]);
+    }
+
+    // Liked posts
+    const { data: likesData } = await supabase
+      .from("likes")
+      .select("post_id")
+      .eq("user_id", targetId);
+    if (likesData && likesData.length > 0) {
+      const likedIds = likesData.map((l) => l.post_id);
+      const { data: likedPostsData } = await supabase
+        .from("posts")
+        .select("id, media_url, media_type, caption")
+        .in("id", likedIds);
+      setLikedPosts(likedPostsData || []);
+    } else {
+      setLikedPosts([]);
     }
 
     // Followers
@@ -232,6 +249,7 @@ const Profile = () => {
         <TabsList className="w-full glass rounded-2xl mb-4">
           <TabsTrigger value="posts" className="flex-1 gap-2 rounded-xl"><Grid3X3 className="h-4 w-4" /> Posts</TabsTrigger>
           <TabsTrigger value="reposts" className="flex-1 gap-2 rounded-xl"><Repeat2 className="h-4 w-4" /> Reposts</TabsTrigger>
+          <TabsTrigger value="likes" className="flex-1 gap-2 rounded-xl"><Heart className="h-4 w-4" /> Likes</TabsTrigger>
         </TabsList>
         <TabsContent value="posts">
           {posts.length === 0 ? (
@@ -253,6 +271,20 @@ const Profile = () => {
           ) : (
             <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
               {reposts.map((post, i) => (
+                <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} onClick={() => setSelectedPost(post)} className="aspect-square bg-secondary group relative cursor-pointer">
+                  {post.media_type === "video" ? <video src={post.media_url} className="h-full w-full object-cover" /> : <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />}
+                  <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="likes">
+          {likedPosts.length === 0 ? (
+            <div className="glass rounded-3xl py-16 text-center shadow-card"><p className="text-muted-foreground text-sm">No liked posts yet</p></div>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5 rounded-2xl overflow-hidden">
+              {likedPosts.map((post, i) => (
                 <motion.div key={post.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }} onClick={() => setSelectedPost(post)} className="aspect-square bg-secondary group relative cursor-pointer">
                   {post.media_type === "video" ? <video src={post.media_url} className="h-full w-full object-cover" /> : <img src={post.media_url} alt={post.caption} className="h-full w-full object-cover" loading="lazy" />}
                   <div className="absolute inset-0 bg-background/0 group-hover:bg-background/30 transition-colors" />
