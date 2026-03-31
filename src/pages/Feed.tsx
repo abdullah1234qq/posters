@@ -18,6 +18,7 @@ interface Post {
     id: string;
     text: string;
     created_at: string;
+    user_id: string;
     profiles: { username: string; avatar_url: string } | null;
   }[];
   reposts: { user_id: string }[];
@@ -38,7 +39,7 @@ const Feed = () => {
           *,
           profiles:user_id(id, username, avatar_url),
           likes(user_id),
-          comments(id, text, created_at, profiles:user_id(username, avatar_url)),
+          comments(id, text, created_at, user_id, profiles:user_id(username, avatar_url)),
           reposts(user_id)
         `)
         .order("created_at", { ascending: false });

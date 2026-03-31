@@ -14,6 +14,7 @@ interface Comment {
   id: string;
   text: string;
   created_at: string;
+  user_id: string;
   profiles: { username: string; avatar_url: string } | null;
 }
 
@@ -123,6 +124,12 @@ const PostCard = ({
     onCommentAdded();
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return;
+    await supabase.from("comments").delete().eq("id", commentId).eq("user_id", user.id);
+    onCommentAdded();
+  };
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 12 }}
@@ -190,10 +197,17 @@ const PostCard = ({
       {comments.length > 0 && (
         <div className="px-5 pb-2 space-y-1.5">
           {comments.slice(0, 2).map((c) => (
-            <p key={c.id} className="text-sm text-foreground/80">
-              <span className="font-semibold text-foreground">{c.profiles?.username}</span>{" "}
-              {c.text}
-            </p>
+            <div key={c.id} className="flex items-center justify-between group">
+              <p className="text-sm text-foreground/80">
+                <span className="font-semibold text-foreground">{c.profiles?.username}</span>{" "}
+                {c.text}
+              </p>
+              {user?.id === c.user_id && (
+                <button onClick={() => handleDeleteComment(c.id)} className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity text-xs ml-2 shrink-0">
+                  Delete
+                </button>
+              )}
+            </div>
           ))}
           {comments.length > 2 && (
             <p className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
@@ -237,6 +251,7 @@ const PostCard = ({
         onSave={handleSave}
         onRepost={handleRepost}
         onDownload={handleDownload}
+        onDeleteComment={handleDeleteComment}
       />
     </motion.article>
   );
