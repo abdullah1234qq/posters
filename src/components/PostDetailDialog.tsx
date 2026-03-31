@@ -45,8 +45,9 @@ const PostDetailDialog = ({
   open, onOpenChange, mediaUrl, mediaType, caption, createdAt,
   author, likes, liked, saved, reposted, reposts, comments,
   commentText, submitting, onCommentTextChange, onComment,
-  onLike, onSave, onRepost, onDownload,
+  onLike, onSave, onRepost, onDownload, onDeleteComment,
 }: PostDetailDialogProps) => {
+  const { user } = useAuth();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden rounded-2xl border-border/50 bg-background max-h-[90vh]">
