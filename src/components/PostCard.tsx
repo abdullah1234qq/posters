@@ -154,9 +154,9 @@ const PostCard = ({
         </div>
       )}
 
-      <div className="mx-4 mb-4 rounded-2xl overflow-hidden bg-secondary">
+      <div className="mx-4 mb-4 rounded-2xl overflow-hidden bg-secondary cursor-pointer" onClick={() => setDetailOpen(true)}>
         {mediaType === "video" ? (
-          <video src={mediaUrl} controls className="w-full object-cover max-h-[500px]" />
+          <video src={mediaUrl} className="w-full object-cover max-h-[500px]" />
         ) : (
           <img src={mediaUrl} alt={caption} className="w-full object-cover max-h-[500px]" loading="lazy" />
         )}
