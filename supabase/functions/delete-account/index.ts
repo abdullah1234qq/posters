@@ -35,8 +35,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Admin client to delete the auth user (cascade removes profile + related rows)
+    // Admin client to clean up user data and delete the auth user
     const admin = createClient(supabaseUrl, serviceKey);
+
+    // Best-effort cleanup of user-owned rows
+    await admin.from("comments").delete().eq("user_id", user.id);
+    await admin.from("likes").delete().eq("user_id", user.id);
+    await admin.from("reposts").delete().eq("user_id", user.id);
+    await admin.from("saved_posts").delete().eq("user_id", user.id);
+    await admin.from("follows").delete().or(`follower_id.eq.${user.id},following_id.eq.${user.id}`);
+    await admin.from("posts").delete().eq("user_id", user.id);
+    await admin.from("profiles").delete().eq("id", user.id);
+
     const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
