@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import CreatePost from "./pages/CreatePost";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
+import Likes from "./pages/Likes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,7 +46,7 @@ const App = () => (
               <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              <Route path="/likes" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
+              <Route path="/likes" element={<ProtectedRoute><Likes /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
