@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Grid3X3, Repeat2 } from "lucide-react";
+import { Camera, Grid3X3, Repeat2, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useNavigate } from "react-router-dom";
 
 interface Profile {
   id: string;
@@ -30,11 +32,27 @@ interface Post {
 
 const Profile = () => {
   const { userId } = useParams();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const targetId = userId || user?.id;
   const isOwnProfile = !userId || userId === user?.id;
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+      toast({ title: "Account deleted" });
+      await signOut();
+      navigate("/auth");
+    } catch (err: any) {
+      toast({ title: "Failed to delete account", description: err.message, variant: "destructive" });
+      setDeleting(false);
+    }
+  };
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -216,7 +234,30 @@ const Profile = () => {
                 </div>
                 <p className="text-sm text-muted-foreground mt-3">{profile?.bio || "No bio yet"}</p>
                 {isOwnProfile ? (
-                  <Button size="sm" variant="outline" className="mt-3 rounded-xl border-border/50" onClick={() => setEditing(true)}>Edit Profile</Button>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Button size="sm" variant="outline" className="rounded-xl border-border/50" onClick={() => setEditing(true)}>Edit Profile</Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="rounded-xl border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                          <Trash2 className="h-4 w-4" /> Delete Account
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="rounded-2xl">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete your profile, posts, comments, likes, reposts, and follows. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteAccount} disabled={deleting} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            {deleting ? "Deleting..." : "Yes, delete"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 ) : user ? (
                   <Button size="sm" className={`mt-3 rounded-xl border-0 ${isFollowing ? "bg-secondary text-foreground" : "gradient-warm text-primary-foreground"}`} onClick={handleFollow} disabled={followLoading}>
                     {isFollowing ? "Unfollow" : "Follow"}
